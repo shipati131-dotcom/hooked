@@ -1,0 +1,23 @@
+{
+  "name": "hooked",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "HOOKED - a cozy, progression-driven casual fishing game built with Phaser 4.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "phaser": "^4.2.1"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.14.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.0"
+  }
+}
