@@ -41,7 +41,7 @@ export class UpgradeScene extends Phaser.Scene {
         const w = GAME_WIDTH - 200 - 80;
         const c = this.add.container(0, y);
         const bg = this.add.graphics();
-        bg.fillStyle(0x08222d, 0.5);
+        bg.fillStyle(0x0d232c, 0.5);
         bg.fillRoundedRect(0, 6, w, 112, 14);
         c.add(bg);
 
@@ -49,15 +49,15 @@ export class UpgradeScene extends Phaser.Scene {
         const maxed = services.upgrades.isMaxed(perk.id);
         const cost = services.upgrades.nextCost(perk.id);
 
-        const name = this.add.text(28, 20, perk.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#fff6e0' });
-        const desc = this.add.text(28, 50, perk.description, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#a9c9cf' });
-        const effect = this.add.text(28, 76, perk.format(level, Math.min(perk.maxLevel, level + 1)), { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#8fd8c9', fontStyle: '700' });
+        const name = this.add.text(28, 20, perk.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#f4e8cf' });
+        const desc = this.add.text(28, 50, perk.description, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#b3a488' });
+        const effect = this.add.text(28, 76, perk.format(level, Math.min(perk.maxLevel, level + 1)), { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#5ecdbd', fontStyle: '700' });
         c.add([name, desc, effect]);
 
         const bar = new ProgressBar(this, 28, 100, { width: 300, height: 10, fillColor: COLORS.gold });
         bar.setValueImmediate(level / perk.maxLevel);
         c.add(bar);
-        c.add(this.add.text(28 + 300 + 12, 95, `${level}/${perk.maxLevel}`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#c9e8ec' }));
+        c.add(this.add.text(28 + 300 + 12, 95, `${level}/${perk.maxLevel}`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#d8c9a3' }));
 
         if (maxed) {
             c.add(new Button(this, w - 110, 56, 'MAXED', undefined, { width: 170, height: 48, color: 0x4a5a5e, fontSize: 16, disabled: true }));

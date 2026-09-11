@@ -33,7 +33,7 @@ export function buildTextures(scene: Phaser.Scene): void {
 
     // Coin icon.
     g.clear();
-    g.fillStyle(0xf7d585, 1);
+    g.fillStyle(0xe7b94f, 1);
     g.fillCircle(12, 12, 11);
     g.fillStyle(0xf0b93d, 1);
     g.fillCircle(12, 12, 8.5);

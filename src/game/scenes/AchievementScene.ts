@@ -35,7 +35,7 @@ export class AchievementScene extends Phaser.Scene {
         tabs.forEach((tab, i) => {
             const btn = this.add.container(left + 130 + i * 200, top + 130);
             const bg = this.add.graphics();
-            const label = this.add.text(0, 0, tab.label, { fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#eaf6f8' }).setOrigin(0.5);
+            const label = this.add.text(0, 0, tab.label, { fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#f4e8cf' }).setOrigin(0.5);
             btn.add([bg, label]);
             btn.setSize(180, 44).setInteractive({ useHandCursor: true });
             btn.on('pointerdown', () => { this.activeTab = tab.key; this.rebuild(services); });
@@ -59,9 +59,9 @@ export class AchievementScene extends Phaser.Scene {
             const active = tabs[i] === this.activeTab;
             const bg = btn.list[0] as Phaser.GameObjects.Graphics;
             bg.clear();
-            bg.fillStyle(active ? COLORS.gold : 0x0f3b4f, active ? 1 : 0.6);
+            bg.fillStyle(active ? COLORS.gold : 0x16333f, active ? 1 : 0.6);
             bg.fillRoundedRect(-90, -22, 180, 44, 12);
-            (btn.list[1] as Phaser.GameObjects.Text).setColor(active ? '#0c2733' : '#eaf6f8');
+            (btn.list[1] as Phaser.GameObjects.Text).setColor(active ? '#17252b' : '#f4e8cf');
         });
 
         if (this.activeTab === 'challenges') this.buildChallenges(services);
@@ -76,13 +76,13 @@ export class AchievementScene extends Phaser.Scene {
             const cont = this.add.container(0, i * rowH);
             const w = GAME_WIDTH - 200 - 80;
             const bg = this.add.graphics();
-            bg.fillStyle(0x08222d, 0.5);
+            bg.fillStyle(0x0d232c, 0.5);
             bg.fillRoundedRect(0, 6, w, 92, 14);
-            const desc = this.add.text(28, 22, c.description, { fontFamily: 'Fredoka, sans-serif', fontSize: '20px', color: '#fff6e0' });
-            const reward = this.add.text(28, 54, `Reward: ${formatCoins(c.rewardCoins)} coins  •  ${c.rewardXp} XP`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#8fd8c9', fontStyle: '700' });
+            const desc = this.add.text(28, 22, c.description, { fontFamily: 'Fredoka, sans-serif', fontSize: '20px', color: '#f4e8cf' });
+            const reward = this.add.text(28, 54, `Reward: ${formatCoins(c.rewardCoins)} coins  •  ${c.rewardXp} XP`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#5ecdbd', fontStyle: '700' });
             const bar = new ProgressBar(this, 28, 78, { width: 340, height: 12, fillColor: COLORS.accent });
             bar.setValueImmediate(Math.min(1, c.progress / c.target));
-            const progressLabel = this.add.text(28 + 340 + 12, 72, `${Math.min(c.progress, c.target)}/${c.target}`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#c9e8ec' });
+            const progressLabel = this.add.text(28 + 340 + 12, 72, `${Math.min(c.progress, c.target)}/${c.target}`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#d8c9a3' });
             const affordable = services.economy.canAfford(BALANCE.challenges.rerollCost);
             const reroll = new Button(this, w - 110, 50, `REROLL ${BALANCE.challenges.rerollCost}`, () => {
                 if (services.challenges.reroll(c.id, p => services.economy.spend(p))) { services.audio.play('click'); services.requestSave(); this.rebuild(services); }
@@ -105,13 +105,13 @@ export class AchievementScene extends Phaser.Scene {
             const cont = this.add.container(0, i * rowH);
             const w = GAME_WIDTH - 200 - 80;
             const bg = this.add.graphics();
-            bg.fillStyle(0x08222d, unlocked ? 0.5 : 0.25);
+            bg.fillStyle(0x0d232c, unlocked ? 0.5 : 0.25);
             bg.fillRoundedRect(0, 4, w, 74, 12);
             const bar = this.add.rectangle(0, 41, 8, 66, unlocked ? COLORS.gold : 0x3a4a4e).setOrigin(0, 0.5);
-            const name = this.add.text(28, 16, a.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '19px', color: unlocked ? '#fff6e0' : '#7a8a90' });
-            const desc = this.add.text(28, 44, a.description, { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#a9c9cf' });
+            const name = this.add.text(28, 16, a.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '19px', color: unlocked ? '#f4e8cf' : '#7a8a90' });
+            const desc = this.add.text(28, 44, a.description, { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#b3a488' });
             const reward = this.add.text(w - 180, 41, unlocked ? 'UNLOCKED' : `+${formatCoins(a.rewardCoins)}`, {
-                fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: unlocked ? '#8affb0' : '#c9e8ec', fontStyle: '800'
+                fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: unlocked ? '#e7b94f' : '#d8c9a3', fontStyle: '800'
             }).setOrigin(0, 0.5);
             cont.add([bg, bar, name, desc, reward]);
             return cont;
@@ -139,8 +139,8 @@ export class AchievementScene extends Phaser.Scene {
         const rowH = 46;
         const items = rows.map(([label, value], i) => {
             const cont = this.add.container(0, i * rowH);
-            const l = this.add.text(20, 0, label, { fontFamily: 'Nunito, sans-serif', fontSize: '16px', color: '#a9c9cf', fontStyle: '700' });
-            const v = this.add.text(500, 0, value, { fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#fff6e0' });
+            const l = this.add.text(20, 0, label, { fontFamily: 'Nunito, sans-serif', fontSize: '16px', color: '#b3a488', fontStyle: '700' });
+            const v = this.add.text(500, 0, value, { fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#f4e8cf' });
             cont.add([l, v]);
             return cont;
         });

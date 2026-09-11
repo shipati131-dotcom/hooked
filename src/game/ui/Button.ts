@@ -10,7 +10,7 @@ export interface ButtonOptions {
     disabled?: boolean;
 }
 
-/** A chunky pill button with a bottom "lip" that presses down on click, plus hover scale. */
+/** A chunky carved-plaque button (not a stadium pill) with a bottom "lip" that presses down on click, plus hover scale. */
 export class Button extends Phaser.GameObjects.Container {
     private bg: Phaser.GameObjects.Graphics;
     private label: Phaser.GameObjects.Text;
@@ -32,7 +32,7 @@ export class Button extends Phaser.GameObjects.Container {
         this.label = scene.add.text(0, -3, text, {
             fontFamily: 'Fredoka, sans-serif',
             fontSize: `${opts.fontSize ?? 24}px`,
-            color: opts.textColor ?? '#0c2733',
+            color: opts.textColor ?? '#17252b',
             fontStyle: '600'
         }).setOrigin(0.5);
 
@@ -68,25 +68,30 @@ export class Button extends Phaser.GameObjects.Container {
     private redraw(pressed: boolean): void {
         const g = this.bg;
         g.clear();
-        const w = this.boxW, h = this.boxH, r = h / 2;
+        const w = this.boxW, h = this.boxH;
+        const r = Math.min(14, h * 0.26); // carved-plaque corner, not a stadium pill
         const lip = pressed ? 2 : 6;
         const color = this.disabled ? COLORS.muted : this.color;
-        const dark = Phaser.Display.Color.ValueToColor(color).darken(28).color;
+        const dark = Phaser.Display.Color.ValueToColor(color).darken(30).color;
+        const edge = Phaser.Display.Color.ValueToColor(color).darken(14).color;
 
+        // base shadow/lip
         g.fillStyle(dark, 1);
         g.fillRoundedRect(-w / 2, -h / 2 + lip, w, h, r);
+        // top face
         g.fillStyle(color, 1);
         g.fillRoundedRect(-w / 2, -h / 2, w, h - lip, r);
+        // inset edge line reads as a carved/painted plaque rather than a glossy web button
         if (!this.disabled) {
-            g.fillStyle(0xffffff, 0.16);
-            g.fillRoundedRect(-w / 2 + 6, -h / 2 + 5, w - 12, h * 0.35, r * 0.6);
+            g.lineStyle(2, edge, 0.5);
+            g.strokeRoundedRect(-w / 2 + 2, -h / 2 + 2, w - 4, h - lip - 4, Math.max(2, r - 2));
         }
         this.label.setY(pressed ? -3 + 3 : -3);
         this.label.setAlpha(this.disabled ? 0.6 : 1);
     }
 }
 
-export function pillLabel(scene: Phaser.Scene, x: number, y: number, text: string, color: number, textColor = '#0c2733'): Phaser.GameObjects.Container {
+export function pillLabel(scene: Phaser.Scene, x: number, y: number, text: string, color: number, textColor = '#17252b'): Phaser.GameObjects.Container {
     const c = scene.add.container(x, y);
     const t = scene.add.text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '16px', color: textColor, fontStyle: '800' }).setOrigin(0.5);
     const g = scene.add.graphics();

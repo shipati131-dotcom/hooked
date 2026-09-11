@@ -14,7 +14,9 @@ export class LocationRenderer {
     private objects: Phaser.GameObjects.GameObject[] = [];
     private emitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
     private waterTiles: Phaser.GameObjects.TileSprite[] = [];
+    private timers: Phaser.Time.TimerEvent[] = [];
     private time = 0;
+    private waterBandY = 0;
 
     constructor(private scene: Phaser.Scene) {}
 
@@ -67,6 +69,40 @@ export class LocationRenderer {
             this.waterTiles.push(ts);
             this.objects.push(ts);
         }
+
+        this.waterBandY = HORIZON_Y;
+        this.buildWaterLife(loc);
+    }
+
+    /** Small ambient life so the water never reads as a flat rectangle: occasional
+     *  ripple rings drifting across the surface, and tiny sunlit highlight glints. */
+    private buildWaterLife(loc: LocationDef): void {
+        const spawnRipple = () => {
+            const rx = Phaser.Math.Between(60, GAME_WIDTH - 60);
+            const ry = Phaser.Math.Between(this.waterBandY + 30, GAME_HEIGHT - 60);
+            const ring = this.scene.add.image(rx, ry, 'ripple-ring')
+                .setDepth(DEPTH.WATER + 2).setScale(0.05).setAlpha(0).setTint(loc.palette.accent);
+            this.objects.push(ring);
+            this.scene.tweens.add({ targets: ring, alpha: 0.22, duration: 260, ease: 'Sine.easeOut' });
+            this.scene.tweens.add({
+                targets: ring, scale: Phaser.Math.FloatBetween(0.35, 0.6), alpha: 0, duration: 2400, ease: 'Sine.easeOut',
+                onComplete: () => { ring.destroy(); this.objects = this.objects.filter(o => o !== ring); }
+            });
+        };
+        const rippleTimer = this.scene.time.addEvent({
+            delay: 2600, startAt: Phaser.Math.Between(0, 2000), loop: true,
+            callback: () => { if (Phaser.Math.Between(0, 100) < 70) spawnRipple(); }
+        });
+        this.timers.push(rippleTimer);
+
+        const glints = this.scene.add.particles(0, 0, 'particle-spark', {
+            x: { min: 0, max: GAME_WIDTH }, y: { min: this.waterBandY + 20, max: GAME_HEIGHT - 40 },
+            lifespan: 2600, speedX: { min: -4, max: 4 }, speedY: { min: -2, max: 2 },
+            scale: { start: 0.5, end: 0 }, alpha: { start: 0.5, end: 0 },
+            tint: 0xffffff, frequency: 700, quantity: 1
+        }).setDepth(DEPTH.WATER + 2).setBlendMode(Phaser.BlendModes.ADD);
+        this.emitters.push(glints);
+        this.objects.push(glints);
     }
 
     private buildProps(loc: LocationDef): void {
@@ -137,11 +173,13 @@ export class LocationRenderer {
     }
 
     clear(): void {
+        for (const t of this.timers) t.remove(false);
         for (const o of this.emitters) o.destroy();
         for (const o of this.objects) if (o.active !== false) o.destroy();
         this.objects = [];
         this.emitters = [];
         this.waterTiles = [];
+        this.timers = [];
     }
 
     destroy(): void { this.clear(); }

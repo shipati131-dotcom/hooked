@@ -25,7 +25,7 @@ export class CollectionScene extends Phaser.Scene {
         const top = GAME_HEIGHT / 2 - sheet.height / 2;
 
         this.countText = this.add.text(left + sheet.width - 220, top + 44, '', {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#f7d585'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#e7b94f'
         }).setOrigin(0, 0.5);
         sheet.content.add(this.countText);
 
@@ -56,7 +56,7 @@ export class CollectionScene extends Phaser.Scene {
         const discovered = !!services.save.fishRecords[fish.id];
         const c = this.add.container(0, y);
         const bg = this.add.graphics();
-        bg.fillStyle(0x08222d, 0.4);
+        bg.fillStyle(0x0d232c, 0.4);
         bg.fillRoundedRect(0, 4, 620, 66, 12);
         c.add(bg);
 
@@ -65,7 +65,7 @@ export class CollectionScene extends Phaser.Scene {
         c.add(icon);
 
         const name = this.add.text(92, 18, discovered ? fish.name : '???', {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '19px', color: discovered ? '#fff6e0' : '#5a6a70'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '19px', color: discovered ? '#f4e8cf' : '#5a6a70'
         });
         const rarityColor = RARITY_COLOR[fish.rarity];
         const sub = this.add.text(92, 44, discovered ? `${RARITY_LABEL[fish.rarity]} • ${getLocation(fish.locations[0]).name}` : 'Undiscovered', {
@@ -86,7 +86,7 @@ export class CollectionScene extends Phaser.Scene {
         const record = services.save.fishRecords[fish.id];
 
         const panel = this.add.graphics();
-        panel.fillStyle(0x08222d, 0.55);
+        panel.fillStyle(0x0d232c, 0.55);
         panel.fillRoundedRect(0, 0, 500, 480, 16);
         this.detailContainer.add(panel);
 
@@ -94,19 +94,19 @@ export class CollectionScene extends Phaser.Scene {
         if (discovered) applyRarityGlow(icon, fish.rarity); else icon.setTint(0x1a1a1a).setAlpha(0.5);
         this.detailContainer.add(icon);
 
-        const name = this.add.text(30, 230, discovered ? fish.name : '???', { fontFamily: 'Fredoka, sans-serif', fontSize: '30px', color: '#fff6e0' });
+        const name = this.add.text(30, 230, discovered ? fish.name : '???', { fontFamily: 'Fredoka, sans-serif', fontSize: '30px', color: '#f4e8cf' });
         const rarity = this.add.text(30, 270, RARITY_LABEL[fish.rarity], { fontFamily: 'Nunito, sans-serif', fontSize: '16px', color: '#' + RARITY_COLOR[fish.rarity].toString(16).padStart(6, '0'), fontStyle: '800' });
         this.detailContainer.add([name, rarity]);
 
         if (discovered) {
-            const desc = this.add.text(30, 300, fish.description, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#c9e8ec', wordWrap: { width: 440 } });
-            const best = this.add.text(30, 350, `Best catch: ${formatWeight(record.bestWeight)}`, { fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#8fd8c9', fontStyle: '700' });
-            const count = this.add.text(30, 375, `Total caught: ${record.caughtCount}`, { fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#8fd8c9', fontStyle: '700' });
-            const locs = this.add.text(30, 400, `Found at: ${fish.locations.map(l => getLocation(l).name).join(', ')}`, { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#a9c9cf', wordWrap: { width: 440 } });
-            const value = this.add.text(30, 430, `Value range: ${formatCoins(fish.baseValue * 0.5)} - ${formatCoins(fish.baseValue * 4)} coins`, { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#a9c9cf' });
+            const desc = this.add.text(30, 300, fish.description, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#d8c9a3', wordWrap: { width: 440 } });
+            const best = this.add.text(30, 350, `Best catch: ${formatWeight(record.bestWeight)}`, { fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#5ecdbd', fontStyle: '700' });
+            const count = this.add.text(30, 375, `Total caught: ${record.caughtCount}`, { fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#5ecdbd', fontStyle: '700' });
+            const locs = this.add.text(30, 400, `Found at: ${fish.locations.map(l => getLocation(l).name).join(', ')}`, { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#b3a488', wordWrap: { width: 440 } });
+            const value = this.add.text(30, 430, `Value range: ${formatCoins(fish.baseValue * 0.5)} - ${formatCoins(fish.baseValue * 4)} coins`, { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#b3a488' });
             this.detailContainer.add([desc, best, count, locs, value]);
         } else {
-            const hint = this.add.text(30, 300, `Found at: ${fish.locations.map(l => getLocation(l).name).join(', ')}`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#a9c9cf' });
+            const hint = this.add.text(30, 300, `Found at: ${fish.locations.map(l => getLocation(l).name).join(', ')}`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#b3a488' });
             const rarity2 = this.add.text(30, 330, 'Catch one to reveal its details.', { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#8fa8b0' });
             this.detailContainer.add([hint, rarity2]);
         }

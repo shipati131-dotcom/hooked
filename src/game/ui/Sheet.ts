@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, DEPTH } from '../constants';
+import { COLORS } from './theme';
 
 export interface Sheet {
     root: Phaser.GameObjects.Container;
@@ -19,26 +20,28 @@ export function buildSheet(scene: Phaser.Scene, title: string, onClose: () => vo
     backdrop.on('pointerdown', () => { /* absorb clicks so they don't reach the scene below */ });
 
     const panel = scene.add.graphics();
-    panel.fillStyle(0x0f3b4f, 0.98);
-    panel.fillRoundedRect(x - width / 2, y - height / 2, width, height, 22);
-    panel.lineStyle(2, 0xffffff, 0.08);
-    panel.strokeRoundedRect(x - width / 2, y - height / 2, width, height, 22);
+    panel.fillStyle(COLORS.panel, 0.98);
+    panel.fillRoundedRect(x - width / 2, y - height / 2, width, height, 16);
+    panel.lineStyle(2, COLORS.sand, 0.22);
+    panel.strokeRoundedRect(x - width / 2, y - height / 2, width, height, 16);
 
     const ribbon = scene.add.graphics();
-    ribbon.fillStyle(0x08222d, 1);
-    ribbon.fillRoundedRect(x - width / 2, y - height / 2, width, 86, { tl: 22, tr: 22, bl: 0, br: 0 });
+    ribbon.fillStyle(COLORS.panelDeep, 1);
+    ribbon.fillRoundedRect(x - width / 2, y - height / 2, width, 86, { tl: 16, tr: 16, bl: 0, br: 0 });
+    ribbon.lineStyle(2, COLORS.sand, 0.15);
+    ribbon.lineBetween(x - width / 2, y - height / 2 + 86, x + width / 2, y - height / 2 + 86);
 
     const titleText = scene.add.text(x - width / 2 + 36, y - height / 2 + 43, title, {
-        fontFamily: 'Fredoka, sans-serif', fontSize: '32px', color: '#fff6e0'
+        fontFamily: 'Fredoka, sans-serif', fontSize: '32px', color: '#f4e8cf'
     }).setOrigin(0, 0.5);
 
     const closeBtn = scene.add.container(x + width / 2 - 44, y - height / 2 + 43);
-    const closeBg = scene.add.circle(0, 0, 22, 0x1a4a5c, 1).setStrokeStyle(2, 0xffffff, 0.2);
-    const closeX = scene.add.text(0, -2, '✕', { fontFamily: 'Nunito, sans-serif', fontSize: '20px', color: '#eaf6f8' }).setOrigin(0.5);
+    const closeBg = scene.add.circle(0, 0, 20, COLORS.panel, 1).setStrokeStyle(2, COLORS.sand, 0.3);
+    const closeX = scene.add.text(0, -2, '✕', { fontFamily: 'Nunito, sans-serif', fontSize: '18px', color: '#f4e8cf' }).setOrigin(0.5);
     closeBtn.add([closeBg, closeX]);
     closeBtn.setSize(44, 44).setInteractive({ useHandCursor: true });
-    closeBtn.on('pointerover', () => closeBg.setFillStyle(0x2a6a80));
-    closeBtn.on('pointerout', () => closeBg.setFillStyle(0x1a4a5c));
+    closeBtn.on('pointerover', () => closeBg.setFillStyle(COLORS.coral));
+    closeBtn.on('pointerout', () => closeBg.setFillStyle(COLORS.panel));
     closeBtn.on('pointerdown', onClose);
 
     const content = scene.add.container(0, 0);
@@ -49,7 +52,7 @@ export function buildSheet(scene: Phaser.Scene, title: string, onClose: () => vo
 
 export function statChip(scene: Phaser.Scene, x: number, y: number, text: string): Phaser.GameObjects.Container {
     const c = scene.add.container(x, y);
-    const t = scene.add.text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#c9e8ec', fontStyle: '700' }).setOrigin(0, 0.5);
+    const t = scene.add.text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#d8c9a3', fontStyle: '700' }).setOrigin(0, 0.5);
     c.add(t);
     return c;
 }

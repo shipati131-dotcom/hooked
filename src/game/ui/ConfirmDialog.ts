@@ -10,16 +10,16 @@ export function showConfirmDialog(scene: Phaser.Scene, title: string, message: s
 
     const w = 480, h = 220;
     const panel = scene.add.graphics();
-    panel.fillStyle(0x0f3b4f, 1);
-    panel.fillRoundedRect(GAME_WIDTH / 2 - w / 2, GAME_HEIGHT / 2 - h / 2, w, h, 18);
-    panel.lineStyle(2, 0xe15a4a, 0.6);
-    panel.strokeRoundedRect(GAME_WIDTH / 2 - w / 2, GAME_HEIGHT / 2 - h / 2, w, h, 18);
+    panel.fillStyle(COLORS.panel, 1);
+    panel.fillRoundedRect(GAME_WIDTH / 2 - w / 2, GAME_HEIGHT / 2 - h / 2, w, h, 14);
+    panel.lineStyle(2, COLORS.danger, 0.55);
+    panel.strokeRoundedRect(GAME_WIDTH / 2 - w / 2, GAME_HEIGHT / 2 - h / 2, w, h, 14);
 
     const titleText = scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - h / 2 + 36, title, {
-        fontFamily: 'Fredoka, sans-serif', fontSize: '26px', color: '#fff6e0'
+        fontFamily: 'Fredoka, sans-serif', fontSize: '26px', color: '#f4e8cf'
     }).setOrigin(0.5);
     const msgText = scene.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10, message, {
-        fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#c9e8ec', align: 'center', wordWrap: { width: w - 60 }
+        fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#d8c9a3', align: 'center', wordWrap: { width: w - 60 }
     }).setOrigin(0.5);
 
     root.add([backdrop, panel, titleText, msgText]);
@@ -30,7 +30,7 @@ export function showConfirmDialog(scene: Phaser.Scene, title: string, message: s
     const confirmBtn = new Button(scene, GAME_WIDTH / 2 + 110, GAME_HEIGHT / 2 + h / 2 - 44, 'CONFIRM', () => {
         root.destroy();
         onConfirm();
-    }, { width: 180, height: 52, color: COLORS.danger, fontSize: 18, textColor: '#fff6e0' });
+    }, { width: 180, height: 52, color: COLORS.danger, fontSize: 18, textColor: '#f4e8cf' });
 
     root.add([cancelBtn, confirmBtn]);
 }

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TRACK_HEIGHT, type ReelSnapshot } from '../systems/FishingSystem';
 import type { Rarity } from '../constants';
 import { applyRarityGlow } from './glow';
+import { COLORS } from './theme';
 
 const TRACK_WIDTH = 96;
 
@@ -26,7 +27,7 @@ export class ReelMeter extends Phaser.GameObjects.Container {
         this.meterBar = scene.add.graphics();
         this.tensionBar = scene.add.graphics();
         this.tensionLabel = scene.add.text(TRACK_WIDTH / 2 + 44, -TRACK_HEIGHT - 4, 'TENSION', {
-            fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#ffb0a0', fontStyle: '800'
+            fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#e8a08c', fontStyle: '800'
         }).setOrigin(0.5, 1).setVisible(false);
 
         this.drawTrack();
@@ -37,10 +38,10 @@ export class ReelMeter extends Phaser.GameObjects.Container {
 
     private drawTrack(): void {
         this.track.clear();
-        this.track.fillStyle(0x08222d, 0.65);
-        this.track.fillRoundedRect(-TRACK_WIDTH / 2, -TRACK_HEIGHT, TRACK_WIDTH, TRACK_HEIGHT, 16);
-        this.track.lineStyle(2, 0xffffff, 0.15);
-        this.track.strokeRoundedRect(-TRACK_WIDTH / 2, -TRACK_HEIGHT, TRACK_WIDTH, TRACK_HEIGHT, 16);
+        this.track.fillStyle(COLORS.panelDeep, 0.72);
+        this.track.fillRoundedRect(-TRACK_WIDTH / 2, -TRACK_HEIGHT, TRACK_WIDTH, TRACK_HEIGHT, 14);
+        this.track.lineStyle(2, COLORS.sand, 0.28);
+        this.track.strokeRoundedRect(-TRACK_WIDTH / 2, -TRACK_HEIGHT, TRACK_WIDTH, TRACK_HEIGHT, 14);
     }
 
     beginEncounter(fishTextureKey: string, rarity: Rarity): void {
@@ -58,32 +59,36 @@ export class ReelMeter extends Phaser.GameObjects.Container {
 
         this.zoneGfx.clear();
         const zoneTop = toLocalY(snap.zoneY + snap.zoneHeight);
-        const zoneColor = snap.inZone ? 0x8affb0 : 0x4dd4c4;
-        this.zoneGfx.fillStyle(zoneColor, snap.inZone ? 0.38 : 0.22);
-        this.zoneGfx.fillRoundedRect(-TRACK_WIDTH / 2 + 4, zoneTop, TRACK_WIDTH - 8, snap.zoneHeight, 10);
-        this.zoneGfx.lineStyle(3, zoneColor, 0.9);
-        this.zoneGfx.strokeRoundedRect(-TRACK_WIDTH / 2 + 4, zoneTop, TRACK_WIDTH - 8, snap.zoneHeight, 10);
+        const zoneColor = snap.inZone ? COLORS.accent : COLORS.accentDeep;
+        this.zoneGfx.fillStyle(zoneColor, snap.inZone ? 0.4 : 0.2);
+        this.zoneGfx.fillRoundedRect(-TRACK_WIDTH / 2 + 4, zoneTop, TRACK_WIDTH - 8, snap.zoneHeight, 9);
+        this.zoneGfx.lineStyle(3, zoneColor, snap.inZone ? 0.95 : 0.6);
+        this.zoneGfx.strokeRoundedRect(-TRACK_WIDTH / 2 + 4, zoneTop, TRACK_WIDTH - 8, snap.zoneHeight, 9);
 
         this.fishIcon.setPosition(0, toLocalY(snap.fishY));
         this.fishIcon.setScale(snap.inZone ? 0.62 : 0.55);
 
         this.meterBar.clear();
         const meterX = -TRACK_WIDTH / 2 - 26;
-        this.meterBar.fillStyle(0x08222d, 0.6);
+        this.meterBar.fillStyle(COLORS.panelDeep, 0.55);
         this.meterBar.fillRoundedRect(meterX - 8, -TRACK_HEIGHT, 16, TRACK_HEIGHT, 8);
         const meterH = TRACK_HEIGHT * snap.meter;
-        this.meterBar.fillStyle(0xf0c93d, 1);
-        this.meterBar.fillRoundedRect(meterX - 8, -meterH, 16, meterH, 8);
+        if (meterH > 1) {
+            this.meterBar.fillStyle(COLORS.gold, 1);
+            this.meterBar.fillRoundedRect(meterX - 8, -meterH, 16, meterH, 8);
+        }
 
         this.tensionBar.clear();
         this.tensionLabel.setVisible(snap.tensionActive);
         if (snap.tensionActive) {
             const tX = TRACK_WIDTH / 2 + 26;
-            this.tensionBar.fillStyle(0x08222d, 0.6);
+            this.tensionBar.fillStyle(COLORS.panelDeep, 0.55);
             this.tensionBar.fillRoundedRect(tX - 8, -TRACK_HEIGHT, 16, TRACK_HEIGHT, 8);
             const tH = TRACK_HEIGHT * snap.tension;
-            this.tensionBar.fillStyle(snap.tension > 0.75 ? 0xff4a3a : 0xe17a4a, 1);
-            this.tensionBar.fillRoundedRect(tX - 8, -tH, 16, tH, 8);
+            if (tH > 1) {
+                this.tensionBar.fillStyle(snap.tension > 0.75 ? COLORS.danger : COLORS.coral, 1);
+                this.tensionBar.fillRoundedRect(tX - 8, -tH, 16, tH, 8);
+            }
         }
     }
 

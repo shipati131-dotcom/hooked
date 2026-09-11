@@ -29,39 +29,39 @@ export class HudScene extends Phaser.Scene {
         const services = getServices(this);
 
         // top-left: level + XP
-        this.add.rectangle(150, 46, 260, 68, 0x08222d, 0.55).setOrigin(0.5).setDepth(DEPTH.UI_PANEL);
+        this.add.rectangle(150, 46, 260, 68, 0x0d232c, 0.55).setOrigin(0.5).setDepth(DEPTH.UI_PANEL);
         this.levelText = this.add.text(40, 22, `Lv ${services.save.level}`, {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '26px', color: '#fff6e0'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '26px', color: '#f4e8cf'
         }).setDepth(DEPTH.UI_PANEL + 1);
         this.xpBar = new ProgressBar(this, 40, 58, { width: 220, height: 14, fillColor: COLORS.accent });
         this.xpBar.setDepth(DEPTH.UI_PANEL + 1);
         this.xpBar.setValueImmediate(services.progression.xpProgress);
 
         // top-right: coins
-        this.add.rectangle(GAME_WIDTH - 150, 46, 240, 56, 0x08222d, 0.55).setOrigin(0.5).setDepth(DEPTH.UI_PANEL);
+        this.add.rectangle(GAME_WIDTH - 150, 46, 240, 56, 0x0d232c, 0.55).setOrigin(0.5).setDepth(DEPTH.UI_PANEL);
         this.add.image(GAME_WIDTH - 260, 46, 'coin-icon').setScale(1.3).setDepth(DEPTH.UI_PANEL + 1);
         this.coinsText = this.add.text(GAME_WIDTH - 235, 46, formatCoins(services.economy.coins), {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '26px', color: '#f7d585'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '26px', color: '#e7b94f'
         }).setOrigin(0, 0.5).setDepth(DEPTH.UI_PANEL + 1);
 
         // location label
         this.locationText = this.add.text(GAME_WIDTH / 2, 26, getLocation(services.save.currentLocation).name, {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#c9e8ec'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#d8c9a3'
         }).setOrigin(0.5, 0).setDepth(DEPTH.UI_PANEL + 1).setInteractive({ useHandCursor: true });
         this.locationText.on('pointerdown', () => this.openOverlay(SCENE_KEYS.MAP));
 
         // settings gear
-        this.add.circle(GAME_WIDTH - 40, 96, 20, 0x08222d, 0.55).setDepth(DEPTH.UI_PANEL);
+        this.add.circle(GAME_WIDTH - 40, 96, 20, 0x0d232c, 0.55).setDepth(DEPTH.UI_PANEL);
         const gear = this.add.text(GAME_WIDTH - 40, 96, '⚙', {
-            fontFamily: 'Nunito, sans-serif', fontSize: '24px', color: '#c9e8ec'
+            fontFamily: 'Nunito, sans-serif', fontSize: '24px', color: '#d8c9a3'
         }).setOrigin(0.5).setDepth(DEPTH.UI_PANEL + 1).setInteractive({ useHandCursor: true });
-        gear.on('pointerover', () => gear.setColor('#f7d585'));
-        gear.on('pointerout', () => gear.setColor('#c9e8ec'));
+        gear.on('pointerover', () => gear.setColor('#e7b94f'));
+        gear.on('pointerout', () => gear.setColor('#d8c9a3'));
         gear.on('pointerdown', () => this.openOverlay(SCENE_KEYS.SETTINGS));
 
         // goal widget
         this.goalText = this.add.text(GAME_WIDTH / 2, 62, '', {
-            fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#8fd8c9', fontStyle: '700', align: 'center'
+            fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#5ecdbd', fontStyle: '700', align: 'center'
         }).setOrigin(0.5, 0).setDepth(DEPTH.UI_PANEL + 1);
         this.refreshGoal(services);
 
@@ -96,20 +96,20 @@ export class HudScene extends Phaser.Scene {
         const spacing = 190;
         const startX = GAME_WIDTH / 2 - ((total - 1) * spacing) / 2;
 
-        this.add.rectangle(GAME_WIDTH / 2, y, GAME_WIDTH, 80, 0x08222d, 0.6).setDepth(DEPTH.UI_PANEL);
+        this.add.rectangle(GAME_WIDTH / 2, y, GAME_WIDTH, 80, 0x0d232c, 0.6).setDepth(DEPTH.UI_PANEL);
 
         NAV_ITEMS.forEach((item, i) => {
             const c = this.add.container(startX + i * spacing, y).setDepth(DEPTH.UI_PANEL + 1);
             const bg = this.add.graphics();
             const label = this.add.text(0, 0, item.label, {
-                fontFamily: 'Fredoka, sans-serif', fontSize: '17px', color: '#eaf6f8'
+                fontFamily: 'Fredoka, sans-serif', fontSize: '17px', color: '#f4e8cf'
             }).setOrigin(0.5);
-            bg.fillStyle(0x0f3b4f, 0.001); // invisible hit area (drawn via container size)
+            bg.fillStyle(0x16333f, 0.001); // invisible hit area (drawn via container size)
             c.add([bg, label]);
             c.setSize(170, 60);
             c.setInteractive({ useHandCursor: true });
-            c.on('pointerover', () => label.setColor('#f7d585'));
-            c.on('pointerout', () => label.setColor(this.isActive(item.key) ? '#f7d585' : '#eaf6f8'));
+            c.on('pointerover', () => label.setColor('#e7b94f'));
+            c.on('pointerout', () => label.setColor(this.isActive(item.key) ? '#e7b94f' : '#f4e8cf'));
             c.on('pointerdown', () => {
                 getServices(this).audio.play('click');
                 if (item.key === SCENE_KEYS.FISHING) this.restartFishing();
@@ -127,7 +127,7 @@ export class HudScene extends Phaser.Scene {
     private highlightActiveNav(): void {
         NAV_ITEMS.forEach((item, i) => {
             const label = this.navButtons[i].list[1] as Phaser.GameObjects.Text;
-            label.setColor(this.isActive(item.key) ? '#f7d585' : '#eaf6f8');
+            label.setColor(this.isActive(item.key) ? '#e7b94f' : '#f4e8cf');
         });
     }
 
@@ -171,15 +171,15 @@ export class HudScene extends Phaser.Scene {
     private showLevelUp(level: number): void {
         getServices(this).audio.play('levelup');
         const burst = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2).setDepth(DEPTH.UI_POPUP);
-        const bg = this.add.circle(0, 0, 10, 0xf7d585, 0.9);
-        const label = this.add.text(0, 0, `LEVEL ${level}!`, { fontFamily: 'Fredoka, sans-serif', fontSize: '48px', color: '#0c2733' }).setOrigin(0.5);
+        const bg = this.add.circle(0, 0, 10, 0xe7b94f, 0.9);
+        const label = this.add.text(0, 0, `LEVEL ${level}!`, { fontFamily: 'Fredoka, sans-serif', fontSize: '48px', color: '#17252b' }).setOrigin(0.5);
         burst.add([bg, label]);
         this.tweens.add({ targets: bg, scale: 40, alpha: 0, duration: 700, ease: 'Cubic.easeOut' });
         this.tweens.add({ targets: label, scale: { from: 0.3, to: 1.1 }, duration: 350, ease: 'Back.easeOut' });
         this.tweens.add({ targets: burst, alpha: 0, duration: 400, delay: 900, onComplete: () => burst.destroy() });
 
         const sparkles = this.add.particles(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'star-icon', {
-            speed: { min: 150, max: 400 }, lifespan: 800, scale: { start: 1, end: 0 }, quantity: 24, tint: 0xf7d585
+            speed: { min: 150, max: 400 }, lifespan: 800, scale: { start: 1, end: 0 }, quantity: 24, tint: 0xe7b94f
         }).setDepth(DEPTH.UI_POPUP);
         this.time.delayedCall(900, () => sparkles.destroy());
     }
@@ -190,18 +190,18 @@ export class HudScene extends Phaser.Scene {
         const w = 420, h = 90;
         const c = this.add.container(GAME_WIDTH / 2, -80).setDepth(DEPTH.UI_POPUP);
         const bg = this.add.graphics();
-        bg.fillStyle(0x0f3b4f, 0.95);
+        bg.fillStyle(0x16333f, 0.95);
         bg.fillRoundedRect(-w / 2, -h / 2, w, h, 16);
-        bg.lineStyle(3, 0xf7d585, 1);
+        bg.lineStyle(3, 0xe7b94f, 1);
         bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 16);
         const title = this.add.text(-w / 2 + 20, -h / 2 + 14, 'ACHIEVEMENT UNLOCKED', {
-            fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#f7d585', fontStyle: '800'
+            fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#e7b94f', fontStyle: '800'
         });
         const name = this.add.text(-w / 2 + 20, -h / 2 + 34, def.name, {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '24px', color: '#fff6e0'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '24px', color: '#f4e8cf'
         });
         const desc = this.add.text(-w / 2 + 20, -h / 2 + 64, def.description, {
-            fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#c9e8ec'
+            fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#d8c9a3'
         });
         c.add([bg, title, name, desc]);
         this.popupLayer.add(c);

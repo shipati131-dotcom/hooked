@@ -13,6 +13,7 @@ import { floatingText } from '../ui/FloatingText';
 import type { CatchResult, EscapeResult } from '../core/events';
 import { BALANCE } from '../data/balance';
 import { fishForLocation } from '../data/fish';
+import { COLORS } from '../ui/theme';
 
 const ROD_ANCHOR = { x: 130, y: GAME_HEIGHT - 60 };
 const CAST_Y = HORIZON_Y + 130;
@@ -65,12 +66,12 @@ export class FishingScene extends Phaser.Scene {
         this.catchCard = new CatchCard(this);
 
         this.promptText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.78, 'Click the water to cast', {
-            fontFamily: 'Nunito, sans-serif', fontSize: '24px', color: '#eaf6f8', fontStyle: '700'
+            fontFamily: 'Nunito, sans-serif', fontSize: '24px', color: '#f4e8cf', fontStyle: '700'
         }).setOrigin(0.5).setDepth(DEPTH.UI_TOP).setAlpha(0.85);
         this.tweens.add({ targets: this.promptText, alpha: 0.4, duration: 900, yoyo: true, repeat: -1 });
 
         this.hugeBanner = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.22, 'Something HUGE is on the line!', {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '38px', color: '#ff8a3d', stroke: '#0c2733', strokeThickness: 6
+            fontFamily: 'Fredoka, sans-serif', fontSize: '38px', color: '#e8754f', stroke: '#17252b', strokeThickness: 6
         }).setOrigin(0.5).setDepth(DEPTH.UI_TOP).setVisible(false).setAlpha(0);
 
         this.drawRod();
@@ -232,7 +233,12 @@ export class FishingScene extends Phaser.Scene {
             this.rodBend = 1;
             this.tweens.add({ targets: this, rodBend: 0.15, duration: 220, ease: 'Back.easeOut' });
             this.tweens.add({ targets: [this.bobber, this.bobberCap], y: '+=26', duration: 140, ease: 'Sine.easeIn', yoyo: true });
-            floatingText(this, this.bobberX, this.bobberY - 60, '!', '#ffdf6b', 44);
+            // bobber compresses under the strike, then pops back -- a squash/stretch beat
+            this.tweens.add({
+                targets: [this.bobber, this.bobberCap], scaleY: 0.55, scaleX: 1.35, duration: 90, ease: 'Sine.easeOut',
+                onComplete: () => this.tweens.add({ targets: [this.bobber, this.bobberCap], scaleY: 1, scaleX: 1, duration: 220, ease: 'Elastic.easeOut', easeParams: [1, 0.6] })
+            });
+            floatingText(this, this.bobberX, this.bobberY - 60, '!', '#f5c451', 44);
         });
 
         this.fishing.on('reelStart', (...args: unknown[]) => {
@@ -287,7 +293,8 @@ export class FishingScene extends Phaser.Scene {
             sizeLabel: rolled.sizeLabel, isNewSpecies, isNewRecord, coins, xp, perfect
         };
 
-        services.audio.play(rolled.fish.rarity === 'legendary' || rolled.fish.rarity === 'mythic' ? 'rare' : 'catch');
+        // CatchCard owns the catch/rare sfx timing itself so the sound lands on the
+        // actual reveal beat rather than spoiling a suspenseful rare-fish teaser.
         this.reelMeter.endEncounter();
 
         this.resultCardOpen = true;
@@ -307,7 +314,7 @@ export class FishingScene extends Phaser.Scene {
         this.cameras.main.shake(180, 0.007);
         const pct = Math.round(meter * 100);
         floatingText(this, GAME_WIDTH / 2, GAME_HEIGHT * 0.4,
-            lineSnapped ? 'The line snapped!' : `It got away… (so close: ${pct}%)`, '#ff8a7a', 26);
+            lineSnapped ? 'The line snapped!' : `It got away… (so close: ${pct}%)`, '#e8a08c', 26);
         this.rodBend = 0;
         this.onIdleReturn();
         services.requestSave();
@@ -361,9 +368,20 @@ export class FishingScene extends Phaser.Scene {
 
         const services = getServices(this);
         const lineColor = services.equipment.getLoadout().line.color;
-        const wobble = this.fishing.state === 'reeling' ? Math.sin(this.time.now * 0.02) * 6 * this.fishing.snapshot().tension : 0;
+        const snap = this.fishing.state === 'reeling' ? this.fishing.snapshot() : null;
+        const tension = snap?.tensionActive ? snap.tension : 0;
 
-        this.lineGfx.lineStyle(2, lineColor, 0.85);
+        // A relaxed line has a gentle organic sway; as tension climbs it visibly
+        // straightens and thickens, then reddens toward the danger color right
+        // before a snap -- "the line tightens" made legible at a glance.
+        const wobble = Math.sin(this.time.now * 0.02) * 5 * (1 - tension) * (this.fishing.state === 'reeling' ? 1 : 0.4);
+        const width = 2 + tension * 2.5;
+        const color = tension > 0 ? Phaser.Display.Color.Interpolate.ColorWithColor(
+            Phaser.Display.Color.ValueToColor(lineColor), Phaser.Display.Color.ValueToColor(COLORS.danger), 100, Math.round(tension * 100)
+        ) : null;
+        const strokeColor = color ? Phaser.Display.Color.GetColor(color.r, color.g, color.b) : lineColor;
+
+        this.lineGfx.lineStyle(width, strokeColor, 0.85 + tension * 0.15);
         this.lineGfx.beginPath();
         this.lineGfx.moveTo(this.rodTipX, this.rodTipY);
         this.lineGfx.lineTo((this.rodTipX + targetX) / 2 + wobble, (this.rodTipY + targetY) / 2);

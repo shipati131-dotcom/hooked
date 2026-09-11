@@ -19,7 +19,7 @@ export class SettingsScene extends Phaser.Scene {
         let y = top + 140;
 
         const label = (text: string) => this.add.text(left + 60, y, text, {
-            fontFamily: 'Nunito, sans-serif', fontSize: '18px', color: '#c9e8ec', fontStyle: '700'
+            fontFamily: 'Nunito, sans-serif', fontSize: '18px', color: '#d8c9a3', fontStyle: '700'
         });
 
         sheet.content.add(label('Sound Effects Volume'));
@@ -46,7 +46,7 @@ export class SettingsScene extends Phaser.Scene {
         y += 110;
 
         sheet.content.add(this.add.text(left + 60, y, 'Danger Zone', {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '20px', color: '#e15a4a'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '20px', color: '#c24b3d'
         }));
         y += 40;
 
@@ -54,7 +54,7 @@ export class SettingsScene extends Phaser.Scene {
             showConfirmDialog(this, 'Reset your save?', 'This permanently deletes all progress: coins, level, gear, records and achievements. This cannot be undone.', () => {
                 services.resetSave();
             });
-        }, { width: 260, height: 56, color: COLORS.danger, fontSize: 18, textColor: '#fff6e0' });
+        }, { width: 260, height: 56, color: COLORS.danger, fontSize: 18, textColor: '#f4e8cf' });
         sheet.content.add(resetBtn);
     }
 

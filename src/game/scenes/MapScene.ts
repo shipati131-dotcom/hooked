@@ -42,18 +42,18 @@ export class MapScene extends Phaser.Scene {
             const canUnlock = services.location.canUnlock(loc.id);
 
             const bg = this.add.graphics();
-            bg.fillStyle(current ? 0x155066 : 0x08222d, 0.6);
+            bg.fillStyle(current ? 0x155066 : 0x0d232c, 0.6);
             bg.fillRoundedRect(0, 6, w, 112, 14);
             const accentBar = this.add.rectangle(0, 62, 8, 100, unlocked ? loc.palette.accent : 0x3a4a4e).setOrigin(0, 0.5);
 
-            const name = this.add.text(28, 20, loc.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '24px', color: unlocked ? '#fff6e0' : '#7a8a90' });
-            const desc = this.add.text(28, 52, unlocked ? loc.description : `Requires level ${loc.unlockLevel}`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#a9c9cf', wordWrap: { width: 560 } });
-            const meta = this.add.text(28, 84, unlocked ? `Difficulty ${loc.difficultyMod.toFixed(1)}x  •  Value ${loc.valueMult.toFixed(1)}x` : '', { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#8fd8c9', fontStyle: '700' });
+            const name = this.add.text(28, 20, loc.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '24px', color: unlocked ? '#f4e8cf' : '#7a8a90' });
+            const desc = this.add.text(28, 52, unlocked ? loc.description : `Requires level ${loc.unlockLevel}`, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#b3a488', wordWrap: { width: 560 } });
+            const meta = this.add.text(28, 84, unlocked ? `Difficulty ${loc.difficultyMod.toFixed(1)}x  •  Value ${loc.valueMult.toFixed(1)}x` : '', { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#5ecdbd', fontStyle: '700' });
 
             cont.add([bg, accentBar, name, desc, meta]);
 
             if (current) {
-                cont.add(this.add.text(w - 130, 62, 'YOU ARE HERE', { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#f7d585', fontStyle: '800' }).setOrigin(0.5));
+                cont.add(this.add.text(w - 130, 62, 'YOU ARE HERE', { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#e7b94f', fontStyle: '800' }).setOrigin(0.5));
             } else if (unlocked) {
                 const btn = new Button(this, w - 110, 62, 'TRAVEL', () => {
                     services.location.travel(loc.id);

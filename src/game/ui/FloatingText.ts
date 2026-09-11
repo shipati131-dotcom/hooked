@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 export function floatingText(scene: Phaser.Scene, x: number, y: number, text: string, color = '#ffffff', size = 28): void {
     const t = scene.add.text(x, y, text, {
         fontFamily: 'Fredoka, sans-serif', fontSize: `${size}px`, color,
-        stroke: '#0c2733', strokeThickness: 4
+        stroke: '#17252b', strokeThickness: 4
     }).setOrigin(0.5).setDepth(500).setScale(0.6);
 
     scene.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.easeOut' });

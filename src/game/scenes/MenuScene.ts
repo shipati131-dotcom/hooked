@@ -19,12 +19,12 @@ export class MenuScene extends Phaser.Scene {
         this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.18).setOrigin(0, 0).setDepth(90);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.32, 'HOOKED', {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '128px', color: '#fff6e0',
-            stroke: '#0c2733', strokeThickness: 12
+            fontFamily: 'Fredoka, sans-serif', fontSize: '128px', color: '#f4e8cf',
+            stroke: '#17252b', strokeThickness: 12
         }).setOrigin(0.5).setDepth(100);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.32 + 78, 'a cozy fishing game', {
-            fontFamily: 'Nunito, sans-serif', fontSize: '24px', color: '#c9e8ec', fontStyle: '700'
+            fontFamily: 'Nunito, sans-serif', fontSize: '24px', color: '#d8c9a3', fontStyle: '700'
         }).setOrigin(0.5).setDepth(100);
 
         new Button(this, GAME_WIDTH / 2, GAME_HEIGHT * 0.62, 'PLAY', () => {
@@ -36,7 +36,7 @@ export class MenuScene extends Phaser.Scene {
         if (hasSave) {
             this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.62 + 70,
                 `Level ${services.save.level} • ${services.save.stats.totalCaught} fish caught`,
-                { fontFamily: 'Nunito, sans-serif', fontSize: '18px', color: '#c9e8ec' }
+                { fontFamily: 'Nunito, sans-serif', fontSize: '18px', color: '#d8c9a3' }
             ).setOrigin(0.5).setDepth(100);
         }
 

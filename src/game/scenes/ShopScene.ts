@@ -35,7 +35,7 @@ export class ShopScene extends Phaser.Scene {
         TABS.forEach((tab, i) => {
             const btn = this.add.container(left + 130 + i * 200, top + 130);
             const bg = this.add.graphics();
-            const label = this.add.text(0, 0, tab.label, { fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#eaf6f8' }).setOrigin(0.5);
+            const label = this.add.text(0, 0, tab.label, { fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#f4e8cf' }).setOrigin(0.5);
             btn.add([bg, label]);
             btn.setSize(180, 44).setInteractive({ useHandCursor: true });
             btn.on('pointerdown', () => { this.activeTab = tab.key; this.rebuild(services); });
@@ -59,10 +59,10 @@ export class ShopScene extends Phaser.Scene {
             const active = TABS[i].key === this.activeTab;
             const bg = btn.list[0] as Phaser.GameObjects.Graphics;
             bg.clear();
-            bg.fillStyle(active ? COLORS.gold : 0x0f3b4f, active ? 1 : 0.6);
+            bg.fillStyle(active ? COLORS.gold : 0x16333f, active ? 1 : 0.6);
             bg.fillRoundedRect(-90, -22, 180, 44, 12);
             const label = btn.list[1] as Phaser.GameObjects.Text;
-            label.setColor(active ? '#0c2733' : '#eaf6f8');
+            label.setColor(active ? '#17252b' : '#f4e8cf');
         });
 
         const tab = TABS.find(t => t.key === this.activeTab)!;
@@ -78,7 +78,7 @@ export class ShopScene extends Phaser.Scene {
         const w = GAME_WIDTH - 200 - 80;
         const c = this.add.container(0, y);
         const bg = this.add.graphics();
-        bg.fillStyle(0x08222d, 0.5);
+        bg.fillStyle(0x0d232c, 0.5);
         bg.fillRoundedRect(0, 6, w, 92, 14);
         c.add(bg);
 
@@ -86,12 +86,12 @@ export class ShopScene extends Phaser.Scene {
         const equipped = services.equipment.isEquipped(def.id);
         const levelOk = services.equipment.isUnlockedByLevel(def.id);
 
-        const rarityBar = this.add.rectangle(0, 52, 8, 80, levelOk ? 0x4dd4c4 : 0x5a6a70).setOrigin(0, 0.5);
+        const rarityBar = this.add.rectangle(0, 52, 8, 80, levelOk ? 0x3ab7a7 : 0x5a6a70).setOrigin(0, 0.5);
         c.add(rarityBar);
 
-        const name = this.add.text(28, 22, def.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#fff6e0' });
-        const desc = this.add.text(28, 54, def.description, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#a9c9cf' });
-        const statLine = this.add.text(28, 78, statSummary(def), { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#8fd8c9', fontStyle: '700' });
+        const name = this.add.text(28, 22, def.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#f4e8cf' });
+        const desc = this.add.text(28, 54, def.description, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#b3a488' });
+        const statLine = this.add.text(28, 78, statSummary(def), { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#5ecdbd', fontStyle: '700' });
         c.add([name, desc, statLine]);
 
         if (!levelOk) {

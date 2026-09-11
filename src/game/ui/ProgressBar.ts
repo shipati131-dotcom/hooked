@@ -24,10 +24,10 @@ export class ProgressBar extends Phaser.GameObjects.Container {
         this.boxW = opts.width;
         this.boxH = opts.height;
         this.radius = opts.radius ?? this.boxH / 2;
-        this.fillColor = opts.fillColor ?? 0x4dd4c4;
+        this.fillColor = opts.fillColor ?? 0x3ab7a7;
 
         this.bg = scene.add.graphics();
-        this.bg.fillStyle(opts.bgColor ?? 0x0c2733, 0.7);
+        this.bg.fillStyle(opts.bgColor ?? 0x17252b, 0.7);
         this.bg.fillRoundedRect(0, 0, this.boxW, this.boxH, this.radius);
 
         this.fill = scene.add.graphics();
