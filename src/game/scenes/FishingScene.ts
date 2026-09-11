@@ -78,8 +78,17 @@ export class FishingScene extends Phaser.Scene {
         this.bindInput();
         this.bindFishingEvents(services);
 
-        this.events.on(Phaser.Scenes.Events.UPDATE, (_t: number, dt: number) => this.onUpdate(dt));
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shutdownScene());
+    }
+
+    /**
+     * Phaser calls this directly every frame for the active scene -- unlike
+     * `this.events.on(UPDATE, ...)`, it never accumulates duplicate listeners
+     * across repeated stop()/create() cycles (e.g. every time the player
+     * revisits the FISH tab), so it's the correct place for per-frame logic.
+     */
+    update(_time: number, dt: number): void {
+        this.onUpdate(dt);
     }
 
     // ---------------------------------------------------------------- input
@@ -217,17 +226,17 @@ export class FishingScene extends Phaser.Scene {
             this.showHugeBanner();
         });
 
-        this.fishing.on('bite', (rolled: RolledFish) => {
+        this.fishing.on('bite', (..._args: unknown[]) => {
             services.audio.play('bite');
             this.cameras.main.shake(160, 0.006);
             this.rodBend = 1;
             this.tweens.add({ targets: this, rodBend: 0.15, duration: 220, ease: 'Back.easeOut' });
             this.tweens.add({ targets: [this.bobber, this.bobberCap], y: '+=26', duration: 140, ease: 'Sine.easeIn', yoyo: true });
             floatingText(this, this.bobberX, this.bobberY - 60, '!', '#ffdf6b', 44);
-            void rolled;
         });
 
-        this.fishing.on('reelStart', (rolled: RolledFish) => {
+        this.fishing.on('reelStart', (...args: unknown[]) => {
+            const rolled = args[0] as RolledFish;
             this.bobber.setVisible(false);
             this.bobberCap.setVisible(false);
             this.rodBend = 0.5;
@@ -236,11 +245,13 @@ export class FishingScene extends Phaser.Scene {
             this.reelMeter.beginEncounter(key, rolled.fish.rarity);
         });
 
-        this.fishing.on('reelSuccess', (payload: { rolled: RolledFish; isHuge: boolean; perfect: boolean }) => {
+        this.fishing.on('reelSuccess', (...args: unknown[]) => {
+            const payload = args[0] as { rolled: RolledFish; isHuge: boolean; perfect: boolean };
             this.resolveCatch(services, payload.rolled, payload.perfect);
         });
 
-        this.fishing.on('reelFail', (payload: { rolled: RolledFish; lineSnapped: boolean; meter: number }) => {
+        this.fishing.on('reelFail', (...args: unknown[]) => {
+            const payload = args[0] as { rolled: RolledFish; lineSnapped: boolean; meter: number };
             this.resolveEscape(services, payload.rolled, payload.lineSnapped, payload.meter);
         });
 

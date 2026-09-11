@@ -40,7 +40,10 @@ export class MenuScene extends Phaser.Scene {
             ).setOrigin(0.5).setDepth(100);
         }
 
-        this.events.on(Phaser.Scenes.Events.UPDATE, (_t: number, dt: number) => this.env.update(dt));
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.env.destroy());
+    }
+
+    update(_time: number, dt: number): void {
+        this.env.update(dt);
     }
 }

@@ -152,4 +152,14 @@ export class GameBus {
         if (!set) return;
         for (const fn of [...set]) fn(...args);
     }
+
+    listenerCount(event: string): number {
+        return this.listeners.get(event)?.size ?? 0;
+    }
+
+    removeAllListeners(event?: string): this {
+        if (event) this.listeners.delete(event);
+        else this.listeners.clear();
+        return this;
+    }
 }

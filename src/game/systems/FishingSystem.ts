@@ -1,4 +1,3 @@
-import Phaser from 'phaser';
 import { BALANCE } from '../data/balance';
 import { getLocation } from '../data/locations';
 import { RARITY_ORDER } from '../constants';
@@ -7,6 +6,8 @@ import type { RolledFish } from './FishGenerator';
 import { FishGenerator, type LoadoutLuck } from './FishGenerator';
 import type { LoadoutStats } from './EquipmentSystem';
 import { Rng, rng as defaultRng } from '../utils/rng';
+import { clamp } from '../utils/format';
+import { GameBus } from '../core/GameState';
 
 /** Pixel-space height of the reeling track; ReelMeter renders 1:1 against this. */
 export const TRACK_HEIGHT = 460;
@@ -67,7 +68,7 @@ export interface CastOutcomeFish {
  * -> reel minigame -> result. Pure logic + a tiny bit of Phaser (EventEmitter);
  * the scene owns all visuals/tweens and reacts to the events emitted here.
  */
-export class FishingSystem extends Phaser.Events.EventEmitter {
+export class FishingSystem extends GameBus {
     state: FishingState = 'idle';
 
     private generator = new FishGenerator();
@@ -177,7 +178,7 @@ export class FishingSystem extends Phaser.Events.EventEmitter {
         this.lineSnapResist = ctx.loadout.line.snapResist;
         this.reelCaptureMult = ctx.loadout.reel.captureSpeed * (1 + ctx.strongArmsBonus);
 
-        this.zoneHeight = Phaser.Math.Clamp(
+        this.zoneHeight = clamp(
             BALANCE.minigame.catchZoneBaseHeight + ctx.loadout.rod.control * BALANCE.minigame.catchZoneControlScale,
             90, TRACK_HEIGHT * 0.82
         );
@@ -253,7 +254,7 @@ export class FishingSystem extends Phaser.Events.EventEmitter {
 
         // --- catch zone physics ---
         this.zoneVelocity += (holding ? b.liftAccel : -b.gravity) * dtSec;
-        this.zoneVelocity = Phaser.Math.Clamp(this.zoneVelocity, -b.maxVelocity, b.maxVelocity);
+        this.zoneVelocity = clamp(this.zoneVelocity, -b.maxVelocity, b.maxVelocity);
         this.zoneY += this.zoneVelocity * dtSec;
         if (this.zoneY < 0) { this.zoneY = 0; this.zoneVelocity *= -b.bounceDamp; }
         const maxZoneY = TRACK_HEIGHT - this.zoneHeight;
@@ -270,7 +271,7 @@ export class FishingSystem extends Phaser.Events.EventEmitter {
         if (this.pattern.jitter) {
             this.fishY += (this.r.next() - 0.5) * this.pattern.jitter * this.fishSpeed * dtSec;
         }
-        this.fishY = Phaser.Math.Clamp(this.fishY, 4, TRACK_HEIGHT - 4);
+        this.fishY = clamp(this.fishY, 4, TRACK_HEIGHT - 4);
 
         // --- capture meter ---
         const inZone = this.fishY >= this.zoneY && this.fishY <= this.zoneY + this.zoneHeight;
@@ -280,13 +281,13 @@ export class FishingSystem extends Phaser.Events.EventEmitter {
         } else {
             this.meter -= (b.drainRatePerSec / this.lineSnapResist) * dtSec;
         }
-        this.meter = Phaser.Math.Clamp(this.meter, 0, 1);
+        this.meter = clamp(this.meter, 0, 1);
 
         // --- tension ---
         if (this.tensionActive) {
             if (!inZone) this.tension += b.tensionBuildPerSec * dtSec;
             else this.tension -= b.tensionDecayPerSec * dtSec;
-            this.tension = Phaser.Math.Clamp(this.tension, 0, 1);
+            this.tension = clamp(this.tension, 0, 1);
         }
 
         if (this.tensionActive && this.tension >= 1) {
@@ -306,11 +307,11 @@ export class FishingSystem extends Phaser.Events.EventEmitter {
         } else if (this.pattern.biasBottom) {
             target = this.r.range(0, TRACK_HEIGHT * 0.4);
         } else {
-            const lo = Phaser.Math.Clamp(this.fishY - spread, 0, TRACK_HEIGHT);
-            const hi = Phaser.Math.Clamp(this.fishY + spread, 0, TRACK_HEIGHT);
+            const lo = clamp(this.fishY - spread, 0, TRACK_HEIGHT);
+            const hi = clamp(this.fishY + spread, 0, TRACK_HEIGHT);
             target = this.r.range(Math.min(lo, hi), Math.max(lo, hi));
         }
-        this.fishTargetY = Phaser.Math.Clamp(target, 8, TRACK_HEIGHT - 8);
+        this.fishTargetY = clamp(target, 8, TRACK_HEIGHT - 8);
     }
 
     private finishReel(caught: boolean, lineSnapped: boolean): void {
