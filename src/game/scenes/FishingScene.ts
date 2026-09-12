@@ -10,7 +10,8 @@ import type { RolledFish } from '../systems/FishGenerator';
 import { ReelMeter } from '../ui/ReelMeter';
 import { CatchCard } from '../ui/CatchCard';
 import { floatingText } from '../ui/FloatingText';
-import type { CatchResult, EscapeResult } from '../core/events';
+import { EVENTS, type CatchResult, type EscapeResult } from '../core/events';
+import { listen } from '../core/listen';
 import { BALANCE } from '../data/balance';
 import { fishForLocation } from '../data/fish';
 import { COLORS } from '../ui/theme';
@@ -21,23 +22,22 @@ import { COLORS } from '../ui/theme';
 // casts.
 const ROD_ANCHOR_Y = GAME_HEIGHT - 90;
 const ROD_FIXED_X = GAME_WIDTH * 0.25;
-// Bigger overall, and stretched a bit wider than tall on top of that so the
-// pole itself reads as thicker (not just scaled up uniformly).
-const ROD_DISPLAY_W = 520;
-const ROD_DISPLAY_H = 320;
+// Bigger overall than a plain uniform scale-up would give.
+const ROD_DISPLAY_W = 480;
+const ROD_DISPLAY_H = 480;
 const ROD_ANGLE_DEG = -47;
-// The rod-vintage art is drawn diagonally within its own frame (handle at the
-// bottom-left origin, tip near the top-right corner). At the ORIGINAL display
-// size this constant was measured against (340x225), the tip sits at local
-// angle -33.5 deg, length ~384 (measured from the source image's opaque
-// pixels). ROD_DISPLAY_W/H have since changed independently of each other
-// (for the "thicker" stretch), so the local tip vector is rescaled by the
-// same non-uniform x/y factors before the fixed ROD_ANGLE_DEG rotation is
-// applied to it -- that keeps the line glued to the tip at any size.
-const ROD_TIP_MEASURED_AT = { w: 340, h: 225 };
-const ROD_TIP_LOCAL = { length: 384, angleDeg: -33.5 };
-const ROD_TIP_SCALE_X = ROD_DISPLAY_W / ROD_TIP_MEASURED_AT.w;
-const ROD_TIP_SCALE_Y = ROD_DISPLAY_H / ROD_TIP_MEASURED_AT.h;
+// The on-screen rod uses the actual per-tier art from the 'equipment-rod'
+// atlas (frame = equipped rod id) instead of one fixed texture, so buying
+// and equipping a new rod is immediately visible here -- see applyRodSkin().
+// All 6 tiers in that atlas share the same pose (measured empirically:
+// handle bottom-left, tip top-right, length ~623px, angle ~-44.4deg, within
+// each 512x512 cell), so one shared tip-offset calculation works for all of
+// them. The handle sits at local origin (0.046, 0.869) of the cell.
+const ROD_ATLAS_CELL = 512;
+const ROD_ATLAS_HANDLE_ORIGIN = { x: 0.046, y: 0.869 };
+const ROD_TIP_LOCAL = { length: 623, angleDeg: -44.4 };
+const ROD_TIP_SCALE_X = ROD_DISPLAY_W / ROD_ATLAS_CELL;
+const ROD_TIP_SCALE_Y = ROD_DISPLAY_H / ROD_ATLAS_CELL;
 const ROD_TIP_LOCAL_RAD = Phaser.Math.DegToRad(ROD_TIP_LOCAL.angleDeg);
 const ROD_TIP_LOCAL_X = Math.cos(ROD_TIP_LOCAL_RAD) * ROD_TIP_LOCAL.length * ROD_TIP_SCALE_X;
 const ROD_TIP_LOCAL_Y = Math.sin(ROD_TIP_LOCAL_RAD) * ROD_TIP_LOCAL.length * ROD_TIP_SCALE_Y;
@@ -49,6 +49,9 @@ const ROD_TIP_OFFSET = {
 const CAST_Y = HORIZON_Y + 130;
 const REEL_METER_X = GAME_WIDTH * 0.5;
 const REEL_METER_Y = 145;
+// The bobber-art source image is 160x237; this scale renders it at a size
+// that's actually readable on the water instead of a near-invisible speck.
+const BOBBER_SCALE = 0.22;
 
 export class FishingScene extends Phaser.Scene {
     private env!: LocationRenderer;
@@ -85,14 +88,15 @@ export class FishingScene extends Phaser.Scene {
             generateFishTexture(this, `fish-${f.id}`, f.art);
         }
 
-        this.rodSprite = this.add.image(ROD_FIXED_X, ROD_ANCHOR_Y, 'rod-vintage')
-            .setOrigin(0.025, 0.95)
+        this.rodSprite = this.add.image(ROD_FIXED_X, ROD_ANCHOR_Y, 'equipment-rod')
+            .setOrigin(ROD_ATLAS_HANDLE_ORIGIN.x, ROD_ATLAS_HANDLE_ORIGIN.y)
             .setDisplaySize(ROD_DISPLAY_W, ROD_DISPLAY_H)
             .setAngle(ROD_ANGLE_DEG)
             .setDepth(DEPTH.ROD);
+        this.applyRodSkin();
         this.lineGfx = this.add.graphics().setDepth(DEPTH.LINE);
         this.bobber = this.add.image(this.bobberX, this.bobberY, 'bobber-art')
-            .setScale(0.044)
+            .setScale(BOBBER_SCALE)
             .setDepth(DEPTH.BOBBER)
             .setVisible(false);
         this.applyBobberSkin();
@@ -116,6 +120,15 @@ export class FishingScene extends Phaser.Scene {
 
         this.bindInput();
         this.bindFishingEvents(services);
+
+        // The Shop pauses (not stops) this scene while open, so create() won't
+        // re-run after a purchase -- refresh the on-screen gear immediately on
+        // equip instead, so a newly bought rod/bobber is visible the moment
+        // the player is back here, not just after some other scene reload.
+        listen(this, services.bus, EVENTS.EQUIP_CHANGED, ({ category }) => {
+            if (category === 'rod') this.applyRodSkin();
+            else if (category === 'bobber') this.applyBobberSkin();
+        });
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.shutdownScene());
     }
@@ -265,8 +278,8 @@ export class FishingScene extends Phaser.Scene {
             this.tweens.add({ targets: this.bobber, y: '+=26', duration: 140, ease: 'Sine.easeIn', yoyo: true });
             // bobber compresses under the strike, then pops back -- a squash/stretch beat
             this.tweens.add({
-                targets: this.bobber, scaleY: 0.024, scaleX: 0.059, duration: 90, ease: 'Sine.easeOut',
-                onComplete: () => this.tweens.add({ targets: this.bobber, scaleY: 0.044, scaleX: 0.044, duration: 220, ease: 'Elastic.easeOut', easeParams: [1, 0.6] })
+                targets: this.bobber, scaleY: BOBBER_SCALE * 0.545, scaleX: BOBBER_SCALE * 1.34, duration: 90, ease: 'Sine.easeOut',
+                onComplete: () => this.tweens.add({ targets: this.bobber, scaleY: BOBBER_SCALE, scaleX: BOBBER_SCALE, duration: 220, ease: 'Elastic.easeOut', easeParams: [1, 0.6] })
             });
             floatingText(this, this.bobberX, this.bobberY - 60, '!', '#f5c451', 44);
         });
@@ -427,6 +440,11 @@ export class FishingScene extends Phaser.Scene {
         const bobberDef = getEquipment(services.save.equipped.bobber);
         const stats = bobberDef.stats as { skinColor: number };
         this.bobber.setTint(stats.skinColor);
+    }
+
+    private applyRodSkin(): void {
+        const services = getServices(this);
+        this.rodSprite.setFrame(services.save.equipped.rod);
     }
 
     private shutdownScene(): void {
