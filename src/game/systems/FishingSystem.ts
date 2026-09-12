@@ -27,6 +27,12 @@ export interface ReelSnapshot {
     combo: number;
     holding: boolean;
     surgesSurvived: number;
+    charge: number;
+    sweetSpotStart: number;
+    sweetSpotEnd: number;
+    pulseResult: 'none' | 'perfect' | 'good' | 'weak' | 'overload';
+    pulseSerial: number;
+    surgeWarning: boolean;
 }
 
 interface PatternConfig {
@@ -108,11 +114,21 @@ export class FishingSystem extends GameBus {
     combo = 0;
     private lastHolding = false;
     private surgesSurvived = 0;
+    charge = 0;
+    sweetSpotStart = 0.5;
+    sweetSpotEnd = 0.73;
+    pulseResult: ReelSnapshot['pulseResult'] = 'none';
+    private pulseSerial = 0;
+    private inputLockedUntilRelease = false;
+    private timingWidth = BALANCE.minigame.strokeSweetWidth;
+    private chargeRate = BALANCE.minigame.strokeChargePerSec;
+    private pullStrength = 1;
+    private surgeDelayMult = 1;
 
     private pattern: PatternConfig = PATTERNS.calm;
-    private fishSpeed = 60;
     private lineMaxTension = 15;
     private lineSnapResist = 1;
+    private strainScale = 1;
     private reelCaptureMult = 1;
 
     startCast(ctx: CastContext, targetX: number): void {
@@ -188,13 +204,10 @@ export class FishingSystem extends GameBus {
 
         this.pattern = PATTERNS[rolled.fish.movementPattern];
         this.lineMaxTension = ctx.loadout.line.maxTension;
-        this.lineSnapResist = ctx.loadout.line.snapResist;
+        this.lineSnapResist = ctx.loadout.line.snapResist * ctx.loadout.reel.tensionResist;
         this.reelCaptureMult = ctx.loadout.reel.captureSpeed * (1 + ctx.strongArmsBonus);
 
-        this.zoneHeight = clamp(
-            BALANCE.minigame.catchZoneBaseHeight + ctx.loadout.rod.control * BALANCE.minigame.catchZoneControlScale,
-            90, TRACK_HEIGHT * 0.82
-        );
+        this.zoneHeight = clamp(BALANCE.minigame.catchZoneBaseHeight + ctx.loadout.rod.control * BALANCE.minigame.catchZoneControlScale, 90, TRACK_HEIGHT * 0.82);
         this.zoneY = (TRACK_HEIGHT - this.zoneHeight) / 2;
         this.zoneVelocity = 0;
 
@@ -202,30 +215,40 @@ export class FishingSystem extends GameBus {
         const weightFactor = 0.6 + 0.4 * rolled.weightPercentile;
         const rodPower = Math.max(0.6, ctx.loadout.rod.power);
         const locationMod = getLocation(ctx.locationId).difficultyMod;
-        const baseSpeed = BALANCE.minigame.fishBaseSpeed;
-        this.fishSpeed = ((baseSpeed + rolled.fish.difficulty * BALANCE.minigame.fishSpeedPerDifficulty) / baseSpeed)
-            * weightFactor
-            * locationMod
-            * difficultyScale
-            * this.pattern.speedScale
-            / rodPower;
+        const fightPressure = weightFactor * locationMod * difficultyScale * this.pattern.speedScale / Math.sqrt(rodPower);
+        this.timingWidth = clamp(
+            BALANCE.minigame.strokeSweetWidth + ctx.loadout.rod.control * BALANCE.minigame.strokeControlWidthPerPoint,
+            0.2, 0.46
+        );
+        // Keep the core reel cadence learnable across species. Difficulty comes
+        // from narrower windows and more dangerous runs, not a wildly changing clock.
+        this.chargeRate = BALANCE.minigame.strokeChargePerSec * clamp(0.92 + rolled.fish.difficulty * 0.025, 0.92, 1.16);
+        this.pullStrength = Math.sqrt(ctx.loadout.rod.power * this.reelCaptureMult);
+        this.surgeDelayMult = 1.45 - rampProgress * 0.35;
 
         this.fishY = TRACK_HEIGHT * this.r.range(0.35, 0.65);
         this.fishTargetY = this.fishY;
         this.fishRetargetTimer = 0;
 
-        this.meter = BALANCE.minigame.meterStart;
+        this.meter = 0.12;
         this.tension = 0;
         const tensionRatio = rolled.weight / Math.max(1, this.lineMaxTension);
-        this.tensionActive = tensionRatio > BALANCE.minigame.tensionThresholdWeightRatio;
+        this.strainScale = clamp((0.55 + tensionRatio * 0.4) * clamp(fightPressure, 0.65, 1.6), 0.55, 2);
+        // Strain is always part of the duel; heavy fish simply punish mistakes harder.
+        this.tensionActive = true;
         this.neverLeftZone = true;
         this.perfectEligible = true;
         this.battlePhase = 'control';
         this.phaseElapsed = 0;
-        this.phaseDuration = this.r.range(BALANCE.minigame.surgeMinDelaySec, BALANCE.minigame.surgeMaxDelaySec);
+        this.phaseDuration = this.r.range(BALANCE.minigame.surgeMinDelaySec, BALANCE.minigame.surgeMaxDelaySec) * this.surgeDelayMult;
         this.combo = 0;
         this.lastHolding = false;
         this.surgesSurvived = 0;
+        this.charge = 0;
+        this.pulseResult = 'none';
+        this.pulseSerial = 0;
+        this.inputLockedUntilRelease = false;
+        this.pickSweetSpot();
 
         this.emit('reelStart', rolled);
     }
@@ -270,7 +293,8 @@ export class FishingSystem extends GameBus {
 
     private updateReeling(dtSec: number, holding: boolean): void {
         const b = BALANCE.minigame;
-        this.lastHolding = holding;
+        const released = this.lastHolding && !holding;
+        const pressed = !this.lastHolding && holding;
 
         // The fight has a readable rhythm: control the fish, survive a telegraphed
         // power surge by giving line, then capitalize on its brief recovery.
@@ -279,72 +303,59 @@ export class FishingSystem extends GameBus {
             if (this.battlePhase === 'control') {
                 this.battlePhase = 'surge';
                 this.phaseDuration = b.surgeDurationSec;
-                this.fishTargetY = this.r.chance(0.5) ? TRACK_HEIGHT * 0.92 : TRACK_HEIGHT * 0.08;
+                this.charge = 0;
+                this.inputLockedUntilRelease = holding;
             } else if (this.battlePhase === 'surge') {
                 this.battlePhase = 'recovery';
                 this.phaseDuration = b.recoveryDurationSec;
                 this.surgesSurvived++;
+                this.inputLockedUntilRelease = false;
+                this.pickSweetSpot(true);
             } else {
                 this.battlePhase = 'control';
-                this.phaseDuration = this.r.range(b.surgeMinDelaySec, b.surgeMaxDelaySec);
+                this.phaseDuration = this.r.range(b.surgeMinDelaySec, b.surgeMaxDelaySec) * this.surgeDelayMult;
+                this.pickSweetSpot();
             }
             this.phaseElapsed = 0;
         }
 
-        // --- catch zone physics ---
-        this.zoneVelocity += (holding ? b.liftAccel : -b.gravity) * dtSec;
-        this.zoneVelocity = clamp(this.zoneVelocity, -b.maxVelocity, b.maxVelocity);
-        this.zoneY += this.zoneVelocity * dtSec;
-        if (this.zoneY < 0) { this.zoneY = 0; this.zoneVelocity *= -b.bounceDamp; }
-        const maxZoneY = TRACK_HEIGHT - this.zoneHeight;
-        if (this.zoneY > maxZoneY) { this.zoneY = maxZoneY; this.zoneVelocity *= -b.bounceDamp; }
+        // The fish still moves for visual character, but control is now about
+        // deliberate reel strokes rather than chasing it with a floating bar.
+        const swim = this.battlePhase === 'surge' ? 2.8 : this.battlePhase === 'recovery' ? 0.7 : 1.45;
+        this.fishY = TRACK_HEIGHT * (0.5 + Math.sin(this.phaseElapsed * swim + this.pattern.speedScale) * 0.28);
 
-        // --- fish movement ---
-        this.fishRetargetTimer -= dtSec;
-        if (this.fishRetargetTimer <= 0) {
-            this.pickFishTarget();
-            this.fishRetargetTimer = this.r.range(this.pattern.retargetMin, this.pattern.retargetMax);
-        }
-        const phaseSpeed = this.battlePhase === 'surge' ? 1.75 : this.battlePhase === 'recovery' ? 0.42 : 1;
-        const approach = 1 - Math.exp(-this.pattern.approachRate * this.fishSpeed * phaseSpeed * dtSec);
-        this.fishY += (this.fishTargetY - this.fishY) * approach;
-        if (this.pattern.jitter) {
-            this.fishY += (this.r.next() - 0.5) * this.pattern.jitter * this.fishSpeed * dtSec;
-        }
-        this.fishY = clamp(this.fishY, 4, TRACK_HEIGHT - 4);
-
-        // --- capture meter ---
-        const inZone = this.fishY >= this.zoneY && this.fishY <= this.zoneY + this.zoneHeight;
-        if (!inZone) { this.neverLeftZone = false; }
         if (this.battlePhase === 'surge') {
-            // Reeling into a surge is dangerous. Letting go gives the fish line and
-            // rapidly cools tension; progress is protected but cannot be gained.
-            if (holding) this.tension += (b.surgeTensionBuildPerSec / this.lineSnapResist) * dtSec;
+            if (holding) this.tension += (b.surgeTensionBuildPerSec * this.strainScale / this.lineSnapResist) * dtSec;
             else this.tension -= b.slackTensionDecayPerSec * dtSec;
-            this.combo = 0;
-        } else if (inZone) {
-            if (holding) {
-                const recoveryBonus = this.battlePhase === 'recovery' ? b.recoveryFillBonus : 0;
-                this.meter += (b.fillRatePerSec * this.reelCaptureMult + recoveryBonus) * dtSec;
-                this.combo = Math.min(5, this.combo + dtSec * 1.4);
-            } else {
-                // Releasing to reposition the control band should not erase good
-                // tracking; it simply stops the landing push until pressure returns.
-                this.combo = Math.max(0, this.combo - dtSec * 1.5);
-            }
+            if (holding) { this.combo = 0; this.neverLeftZone = false; }
         } else {
-            this.meter -= (b.drainRatePerSec / this.lineSnapResist) * dtSec;
-            this.combo = Math.max(0, this.combo - dtSec * 3);
+            if (pressed) this.pulseResult = 'none';
+            if (released && !this.inputLockedUntilRelease) this.resolveStroke();
+            if (!holding && this.inputLockedUntilRelease) {
+                this.charge = 0;
+                this.inputLockedUntilRelease = false;
+            }
+
+            if (holding && !this.inputLockedUntilRelease) {
+                this.charge += this.chargeRate * dtSec;
+                if (this.charge >= 1) {
+                    this.charge = 1;
+                    this.tension += b.strokeOverloadStrain * this.strainScale / this.lineSnapResist;
+                    this.meter -= 0.035;
+                    this.combo = 0;
+                    this.neverLeftZone = false;
+                    this.pulseResult = 'overload';
+                    this.pulseSerial++;
+                    this.emit('reelPulse', { result: this.pulseResult, combo: this.combo });
+                    this.inputLockedUntilRelease = true;
+                }
+            }
+            this.tension -= b.tensionDecayPerSec * dtSec;
+            if (this.surgesSurvived > 0) this.meter -= b.strokePassiveLossPerSec * dtSec;
         }
         this.meter = clamp(this.meter, 0, 1);
-        if (this.surgesSurvived === 0) this.meter = Math.min(this.meter, 0.82);
-
-        // --- tension ---
-        if (this.battlePhase !== 'surge' && this.tensionActive) {
-            if (!inZone) this.tension += b.tensionBuildPerSec * dtSec;
-            else this.tension -= b.tensionDecayPerSec * dtSec;
-        }
         this.tension = clamp(this.tension, 0, 1);
+        this.lastHolding = holding;
 
         if (this.tensionActive && this.tension >= 1) {
             this.finishReel(false, true);
@@ -355,19 +366,38 @@ export class FishingSystem extends GameBus {
         }
     }
 
-    private pickFishTarget(): void {
-        const spread = this.pattern.targetSpread * TRACK_HEIGHT;
-        let target: number;
-        if (this.pattern.burstChance && this.r.chance(this.pattern.burstChance)) {
-            target = this.r.chance(0.5) ? TRACK_HEIGHT * 0.92 : TRACK_HEIGHT * 0.08;
-        } else if (this.pattern.biasBottom) {
-            target = this.r.range(0, TRACK_HEIGHT * 0.4);
+    private resolveStroke(): void {
+        const b = BALANCE.minigame;
+        const center = (this.sweetSpotStart + this.sweetSpotEnd) / 2;
+        const distance = Math.abs(this.charge - center);
+        const perfect = distance <= b.strokePerfectWidth;
+        const good = this.charge >= this.sweetSpotStart && this.charge <= this.sweetSpotEnd;
+        this.pulseResult = perfect ? 'perfect' : good ? 'good' : 'weak';
+
+        if (perfect || good) {
+            this.combo = Math.min(9, this.combo + 1);
+            const accuracy = perfect ? 1.5 : 1;
+            const recovery = this.battlePhase === 'recovery' ? 1.45 : 1;
+            const comboBonus = 1 + Math.max(0, this.combo - 1) * 0.055;
+            this.meter += b.strokeBasePull * this.pullStrength * accuracy * recovery * comboBonus;
+            this.tension -= (perfect ? 0.12 : 0.06);
         } else {
-            const lo = clamp(this.fishY - spread, 0, TRACK_HEIGHT);
-            const hi = clamp(this.fishY + spread, 0, TRACK_HEIGHT);
-            target = this.r.range(Math.min(lo, hi), Math.max(lo, hi));
+            this.combo = 0;
+            this.neverLeftZone = false;
+            this.meter += b.strokeBasePull * this.pullStrength * 0.2;
+            this.tension += b.strokeWeakStrain * this.strainScale / this.lineSnapResist;
         }
-        this.fishTargetY = clamp(target, 8, TRACK_HEIGHT - 8);
+        this.charge = 0;
+        this.pulseSerial++;
+        this.emit('reelPulse', { result: this.pulseResult, combo: this.combo });
+        this.pickSweetSpot(this.battlePhase === 'recovery');
+    }
+
+    private pickSweetSpot(recovery = false): void {
+        const width = clamp(this.timingWidth * (recovery ? 1.3 : 1), 0.2, 0.56);
+        const center = this.r.range(0.48 + width / 2, 0.92 - width / 2);
+        this.sweetSpotStart = center - width / 2;
+        this.sweetSpotEnd = center + width / 2;
     }
 
     private finishReel(caught: boolean, lineSnapped: boolean): void {
@@ -396,7 +426,18 @@ export class FishingSystem extends GameBus {
             combo: Math.floor(this.combo),
             holding: this.lastHolding,
             surgesSurvived: this.surgesSurvived
+            ,
+            charge: this.charge,
+            sweetSpotStart: this.sweetSpotStart,
+            sweetSpotEnd: this.sweetSpotEnd,
+            pulseResult: this.pulseResult,
+            pulseSerial: this.pulseSerial,
+            surgeWarning: this.battlePhase === 'control' && this.phaseProgressValue() > 0.72
         };
+    }
+
+    private phaseProgressValue(): number {
+        return clamp(this.phaseElapsed / Math.max(0.001, this.phaseDuration), 0, 1);
     }
 
     currentFish(): FishDef | null { return this.encounter?.rolled.fish ?? null; }

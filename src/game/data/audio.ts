@@ -25,6 +25,8 @@ export const SFX: SfxDef[] = [
     { key: 'bite', synth: { kind: 'sweep', from: 180, to: 90, decay: 0.22, type: 'sawtooth' } },
     { key: 'reel-tick', synth: { kind: 'click', freq: 900 }, volume: 0.35 },
     { key: 'reel-crank', synth: { kind: 'noise', decay: 0.05, filterFreq: 800 }, volume: 0.15 },
+    { key: 'reel-perfect', synth: { kind: 'chord', freqs: [659, 988], decay: 0.16, type: 'triangle', stagger: 0.025 }, volume: 0.32 },
+    { key: 'reel-miss', synth: { kind: 'sweep', from: 170, to: 105, decay: 0.11, type: 'sine' }, volume: 0.22 },
     { key: 'catch', synth: { kind: 'chord', freqs: [523, 659, 784, 1047], decay: 0.5, type: 'triangle', stagger: 0.05 } },
     { key: 'escape', synth: { kind: 'sweep', from: 400, to: 150, decay: 0.3, type: 'sawtooth' } },
     { key: 'coin', synth: { kind: 'blip', freq: 1200, decay: 0.1, type: 'square' }, volume: 0.4 },

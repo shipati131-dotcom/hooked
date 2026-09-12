@@ -42,7 +42,7 @@ export const BALANCE = {
         maxMs: 5000,
         nibbleChance: 0.55,
         maxNibbles: 2,
-        hookWindowMs: 1400,
+        hookWindowMs: 6000,
         // The reel minigame starts at `tutorialScale` difficulty (for a brand
         // new player still learning to hold/release/manage tension) and
         // ramps smoothly up to full difficulty by `tutorialRampCatches`
@@ -79,6 +79,16 @@ export const BALANCE = {
         fishBaseSpeed: 90,
         fishSpeedPerDifficulty: 22,
         fishSpeedWeightFactor: 0.35
+        ,
+        /** Reel-stroke duel: charge, release in the strike window, then respect fish runs. */
+        strokeChargePerSec: 0.78,
+        strokeBasePull: 0.115,
+        strokePassiveLossPerSec: 0.012,
+        strokeSweetWidth: 0.23,
+        strokeControlWidthPerPoint: 0.009,
+        strokePerfectWidth: 0.075,
+        strokeOverloadStrain: 0.18,
+        strokeWeakStrain: 0.055
     },
 
     perks: {

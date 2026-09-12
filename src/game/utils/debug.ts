@@ -33,6 +33,10 @@ export function installDebugHooks(game: Phaser.Game): void {
             fishing?: { state?: string; snapshot?: () => unknown };
         };
         const fishing = fishingScene?.fishing;
+        const textureKeys = game.textures.getTextureKeys();
+        const frameCount = (key: string) => game.textures.exists(key)
+            ? game.textures.get(key).getFrameNames().filter(name => name !== '__BASE').length
+            : 0;
         return JSON.stringify({
             coordinateSystem: 'origin top-left; x increases right; y increases down; canvas 1600x900',
             activeScenes: game.scene.getScenes(true).map(scene => scene.scene.key),
@@ -41,7 +45,13 @@ export function installDebugHooks(game: Phaser.Game): void {
             coins: services.save.coins,
             totalCaught: services.save.stats.totalCaught,
             fishingState: fishing?.state ?? 'inactive',
-            reel: fishing?.state === 'reeling' ? fishing.snapshot?.() : undefined
+            reel: fishing?.state === 'reeling' ? fishing.snapshot?.() : undefined,
+            assetAudit: {
+                fishTextures: textureKeys.filter(key => key.startsWith('fish-')).length,
+                locationTextures: textureKeys.filter(key => key.startsWith('location-') && !key.endsWith('-video')).length,
+                equipmentFrames: ['rod', 'reel', 'line', 'bait', 'bobber'].reduce((sum, key) => sum + frameCount(`equipment-${key}`), 0),
+                perkFrames: ['lucky-hook', 'quick-bite', 'strong-arms', 'fish-sense', 'golden-touch', 'xp-hunter'].reduce((sum, key) => sum + frameCount(`perk-${key}`), 0)
+            }
         });
     };
 
