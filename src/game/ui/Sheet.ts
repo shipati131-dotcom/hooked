@@ -32,7 +32,8 @@ export function buildSheet(scene: Phaser.Scene, title: string, onClose: () => vo
     ribbon.lineBetween(x - width / 2, y - height / 2 + 86, x + width / 2, y - height / 2 + 86);
 
     const titleText = scene.add.text(x - width / 2 + 36, y - height / 2 + 43, title, {
-        fontFamily: 'Fredoka, sans-serif', fontSize: '32px', color: '#f4e8cf'
+        fontFamily: 'Fredoka, sans-serif', fontSize: '34px', color: '#f4e8cf', fontStyle: '700',
+        stroke: '#07161d', strokeThickness: 4
     }).setOrigin(0, 0.5);
 
     const closeBtn = scene.add.container(x + width / 2 - 44, y - height / 2 + 43);
@@ -46,7 +47,13 @@ export function buildSheet(scene: Phaser.Scene, title: string, onClose: () => vo
 
     const content = scene.add.container(0, 0);
 
-    root.add([backdrop, panel, ribbon, titleText, closeBtn, content]);
+    const topGuard = scene.add.rectangle(x, (y - height / 2) / 2, GAME_WIDTH, y - height / 2, 0x03141c, 1);
+    const bottomEdge = y + height / 2;
+    const bottomGuard = scene.add.rectangle(x, bottomEdge + (GAME_HEIGHT - bottomEdge) / 2, GAME_WIDTH, GAME_HEIGHT - bottomEdge, 0x03141c, 1);
+
+    // Content is below the header so an aggressively scrolled list can never
+    // paint rows over the ribbon, even on renderers with container-mask quirks.
+    root.add([backdrop, panel, content, topGuard, bottomGuard, ribbon, titleText, closeBtn]);
     return { root, content, width, height };
 }
 

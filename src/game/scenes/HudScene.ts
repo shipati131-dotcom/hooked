@@ -22,46 +22,62 @@ export class HudScene extends Phaser.Scene {
     private goalText!: Phaser.GameObjects.Text;
     private navButtons: Phaser.GameObjects.Container[] = [];
     private popupLayer!: Phaser.GameObjects.Container;
+    // Phaser's scene pause/launch/stop calls are queued, not synchronous -- a
+    // second nav click (accidental double-click/tap) landing before the first
+    // transition is processed could pause an already-pausing FishingScene and
+    // launch a second copy of the overlay, which crashed and froze the game.
+    // This guard makes overlay open/close effectively ignore re-entrant calls.
+    private overlayBusy = false;
 
     constructor() { super(SCENE_KEYS.HUD); }
 
     create(): void {
         const services = getServices(this);
 
+        // One high-contrast command bar keeps every top label readable against
+        // all nine biomes; dividers preserve the three information zones.
+        this.add.rectangle(GAME_WIDTH / 2, 52, GAME_WIDTH - 56, 92, 0x071a24, 0.94)
+            .setOrigin(0.5).setDepth(DEPTH.UI_PANEL).setStrokeStyle(2, 0xe8c98d, 0.5);
+        this.add.rectangle(315, 52, 2, 62, 0xe8c98d, 0.28).setDepth(DEPTH.UI_PANEL + 1);
+        this.add.rectangle(GAME_WIDTH - 315, 52, 2, 62, 0xe8c98d, 0.28).setDepth(DEPTH.UI_PANEL + 1);
+
         // top-left: level + XP
-        this.add.rectangle(150, 46, 260, 68, 0x0d232c, 0.55).setOrigin(0.5).setDepth(DEPTH.UI_PANEL);
         this.levelText = this.add.text(40, 22, `Lv ${services.save.level}`, {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '26px', color: '#f4e8cf'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '28px', color: '#ffffff', fontStyle: '700',
+            stroke: '#07161d', strokeThickness: 5
         }).setDepth(DEPTH.UI_PANEL + 1);
         this.xpBar = new ProgressBar(this, 40, 58, { width: 220, height: 14, fillColor: COLORS.accent });
         this.xpBar.setDepth(DEPTH.UI_PANEL + 1);
         this.xpBar.setValueImmediate(services.progression.xpProgress);
 
         // top-right: coins
-        this.add.rectangle(GAME_WIDTH - 150, 46, 240, 56, 0x0d232c, 0.55).setOrigin(0.5).setDepth(DEPTH.UI_PANEL);
-        this.add.image(GAME_WIDTH - 260, 46, 'coin-icon').setScale(1.3).setDepth(DEPTH.UI_PANEL + 1);
+        this.add.image(GAME_WIDTH - 260, 46, 'coin-icon').setDisplaySize(34, 34).setDepth(DEPTH.UI_PANEL + 1);
         this.coinsText = this.add.text(GAME_WIDTH - 235, 46, formatCoins(services.economy.coins), {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '26px', color: '#e7b94f'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '28px', color: '#ffd86b', fontStyle: '700',
+            stroke: '#07161d', strokeThickness: 5
         }).setOrigin(0, 0.5).setDepth(DEPTH.UI_PANEL + 1);
 
         // location label
         this.locationText = this.add.text(GAME_WIDTH / 2, 26, getLocation(services.save.currentLocation).name, {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#d8c9a3'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '26px', color: '#fff5dd', fontStyle: '700',
+            stroke: '#07161d', strokeThickness: 5
         }).setOrigin(0.5, 0).setDepth(DEPTH.UI_PANEL + 1).setInteractive({ useHandCursor: true });
         this.locationText.on('pointerdown', () => this.openOverlay(SCENE_KEYS.MAP));
 
         // settings gear
-        this.add.circle(GAME_WIDTH - 40, 96, 20, 0x0d232c, 0.55).setDepth(DEPTH.UI_PANEL);
-        const gear = this.add.text(GAME_WIDTH - 40, 96, '⚙', {
-            fontFamily: 'Nunito, sans-serif', fontSize: '24px', color: '#d8c9a3'
-        }).setOrigin(0.5).setDepth(DEPTH.UI_PANEL + 1).setInteractive({ useHandCursor: true });
+        this.add.circle(GAME_WIDTH - 54, 52, 23, 0x16333f, 1).setDepth(DEPTH.UI_PANEL + 1)
+            .setStrokeStyle(2, 0xe8c98d, 0.55);
+        const gear = this.add.text(GAME_WIDTH - 54, 52, '⚙', {
+            fontFamily: 'Nunito, sans-serif', fontSize: '25px', color: '#f4e8cf'
+        }).setOrigin(0.5).setDepth(DEPTH.UI_PANEL + 2).setInteractive({ useHandCursor: true });
         gear.on('pointerover', () => gear.setColor('#e7b94f'));
         gear.on('pointerout', () => gear.setColor('#d8c9a3'));
         gear.on('pointerdown', () => this.openOverlay(SCENE_KEYS.SETTINGS));
 
         // goal widget
         this.goalText = this.add.text(GAME_WIDTH / 2, 62, '', {
-            fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#5ecdbd', fontStyle: '700', align: 'center'
+            fontFamily: 'Nunito, sans-serif', fontSize: '18px', color: '#72e4d4', fontStyle: '800', align: 'center',
+            stroke: '#07161d', strokeThickness: 4
         }).setOrigin(0.5, 0).setDepth(DEPTH.UI_PANEL + 1);
         this.refreshGoal(services);
 
@@ -102,7 +118,8 @@ export class HudScene extends Phaser.Scene {
             const c = this.add.container(startX + i * spacing, y).setDepth(DEPTH.UI_PANEL + 1);
             const bg = this.add.graphics();
             const label = this.add.text(0, 0, item.label, {
-                fontFamily: 'Fredoka, sans-serif', fontSize: '17px', color: '#f4e8cf'
+                fontFamily: 'Fredoka, sans-serif', fontSize: '19px', color: '#f4e8cf', fontStyle: '700',
+                stroke: '#07161d', strokeThickness: 3
             }).setOrigin(0.5);
             bg.fillStyle(0x16333f, 0.001); // invisible hit area (drawn via container size)
             c.add([bg, label]);
@@ -136,15 +153,24 @@ export class HudScene extends Phaser.Scene {
     }
 
     private restartFishing(): void {
+        if (this.overlayBusy) return;
+        this.overlayBusy = true;
         for (const key of this.overlayKeys()) {
             if (this.scene.isActive(key)) this.scene.stop(key);
         }
         if (this.scene.isActive(SCENE_KEYS.FISHING)) this.scene.stop(SCENE_KEYS.FISHING);
         this.scene.run(SCENE_KEYS.FISHING);
-        this.time.delayedCall(0, () => this.highlightActiveNav());
+        this.time.delayedCall(0, () => { this.highlightActiveNav(); this.overlayBusy = false; });
     }
 
     private openOverlay(key: string): void {
+        // Ignore a second nav click/tap that lands before the previous
+        // transition's queued scene ops (pause/launch/stop) have been
+        // processed -- without this, a rapid double-click could pause an
+        // already-pausing FishingScene and launch a duplicate overlay scene,
+        // which threw and left the game frozen mid-transition.
+        if (this.overlayBusy) return;
+        this.overlayBusy = true;
         for (const other of this.overlayKeys()) {
             if (other !== key && this.scene.isActive(other)) this.scene.stop(other);
         }
@@ -154,7 +180,7 @@ export class HudScene extends Phaser.Scene {
             this.scene.launch(key);
             this.scene.bringToTop(key);
         }
-        this.time.delayedCall(0, () => this.highlightActiveNav());
+        this.time.delayedCall(0, () => { this.highlightActiveNav(); this.overlayBusy = false; });
     }
 
     private refreshGoal(services: ReturnType<typeof getServices>): void {

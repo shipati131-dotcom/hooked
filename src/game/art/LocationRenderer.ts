@@ -5,6 +5,11 @@ import { generatePropTexture } from './PropArt';
 
 const HORIZON_Y = GAME_HEIGHT * 0.36;
 
+/** Locations with a looping video backdrop instead of a static painted key image. */
+export const LOCATIONS_WITH_VIDEO = new Set<string>([
+    'pond', 'lake', 'river', 'swamp', 'coast', 'ocean', 'fjord', 'volcano', 'abyss'
+]);
+
 /**
  * Fully data-driven environment renderer: reads a LocationDef's palette and
  * prop list and builds a distinct-looking scene from a small shared set of
@@ -22,10 +27,64 @@ export class LocationRenderer {
 
     build(loc: LocationDef): void {
         this.clear();
-        this.buildSky(loc);
-        this.buildWater(loc);
-        this.buildProps(loc);
+        const videoKey = `location-${loc.id}-video`;
+        const artworkKey = `location-${loc.id}`;
+        if (LOCATIONS_WITH_VIDEO.has(loc.id) && this.scene.cache.video.exists(videoKey)) {
+            this.buildVideoArtwork(loc, videoKey);
+        } else if (this.scene.textures.exists(artworkKey)) {
+            this.buildArtwork(loc, artworkKey);
+        } else {
+            // Development fallback if an external asset fails to load.
+            this.buildSky(loc);
+            this.buildWater(loc);
+            this.buildProps(loc);
+        }
         this.buildAmbience(loc);
+    }
+
+    private buildArtwork(loc: LocationDef, key: string): void {
+        const art = this.scene.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, key)
+            .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+            .setDepth(DEPTH.BG_FAR);
+        this.objects.push(art);
+        this.buildLiveWaterOverlay(loc);
+    }
+
+    /** Same full-screen backdrop treatment as buildArtwork, but backed by a
+     *  looping muted video instead of a static painted key image. */
+    private buildVideoArtwork(loc: LocationDef, key: string): void {
+        const video = this.scene.add.video(GAME_WIDTH / 2, GAME_HEIGHT / 2, key)
+            .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+            .setDepth(DEPTH.BG_FAR)
+            .setMute(true);
+        // The video's real dimensions aren't known until its metadata loads, so an
+        // immediate setDisplaySize() can lock in a stale (tiny) native size and the
+        // video renders wildly oversized once real data arrives. Re-applying the
+        // size once Phaser's 'created' event fires (real dimensions known) fixes it.
+        video.on('created', () => video.setDisplaySize(GAME_WIDTH, GAME_HEIGHT));
+        video.play(true);
+        this.objects.push(video);
+        this.buildLiveWaterOverlay(loc);
+    }
+
+    /** Retain just enough live water to make the key art breathe. The low-opacity
+     *  bands move in opposite directions and never obscure the authored reflections
+     *  (or video) beneath them. */
+    private buildLiveWaterOverlay(loc: LocationDef): void {
+        for (let i = 0; i < 2; i++) {
+            const ts = this.scene.add.tileSprite(
+                GAME_WIDTH / 2, HORIZON_Y + 42 + i * 118, GAME_WIDTH, 52, 'water-tile'
+            ).setOrigin(0.5, 0).setDepth(DEPTH.WATER + 2)
+                .setAlpha(i === 0 ? 0.07 : 0.045)
+                .setTint(loc.palette.accent)
+                .setBlendMode(Phaser.BlendModes.ADD);
+            ts.setData('baseAlpha', i === 0 ? 0.07 : 0.045);
+            this.waterTiles.push(ts);
+            this.objects.push(ts);
+        }
+
+        this.waterBandY = HORIZON_Y;
+        this.buildWaterLife(loc);
     }
 
     private buildSky(loc: LocationDef): void {
@@ -66,6 +125,7 @@ export class LocationRenderer {
                 GAME_WIDTH / 2, HORIZON_Y + 40 + i * 90, GAME_WIDTH, 60, 'water-tile'
             ).setOrigin(0.5, 0).setDepth(DEPTH.WATER + 2).setAlpha(0.14 - i * 0.03).setTint(loc.palette.accent);
             ts.setBlendMode(Phaser.BlendModes.ADD);
+            ts.setData('baseAlpha', 0.14 - i * 0.03);
             this.waterTiles.push(ts);
             this.objects.push(ts);
         }
@@ -120,12 +180,140 @@ export class LocationRenderer {
                     .setOrigin(0.5, 1)
                     .setScale(rnd.realInRange(0.8, 1.15));
                 if (isBackground) img.setAlpha(0.85).setTint(0x9fb0a8);
+                
+                if (['reeds', 'palm', 'pine'].includes(prop)) {
+                    this.scene.tweens.add({
+                        targets: img,
+                        angle: rnd.realInRange(2, 4) * (rnd.pick([-1, 1])),
+                        duration: rnd.between(2000, 4000),
+                        delay: rnd.between(0, 2000),
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.inOut'
+                    });
+                }
+                
                 this.objects.push(img);
             }
         }
     }
 
     private buildAmbience(loc: LocationDef): void {
+        const cloudRnd = new Phaser.Math.RandomDataGenerator([loc.id + 'clouds']);
+        for (let i = 0; i < 3; i++) {
+            const cloud = this.scene.add.ellipse(
+                cloudRnd.between(0, GAME_WIDTH), 
+                cloudRnd.between(HORIZON_Y * 0.1, HORIZON_Y * 0.7), 
+                cloudRnd.between(200, 500), 
+                cloudRnd.between(40, 90), 
+                loc.palette.fog, 
+                cloudRnd.realInRange(0.08, 0.15)
+            ).setDepth(DEPTH.BG_FAR + 1);
+            
+            this.scene.tweens.add({
+                targets: cloud,
+                x: `+=${cloudRnd.between(100, 250)}`,
+                duration: cloudRnd.between(30000, 60000),
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.inOut'
+            });
+            this.objects.push(cloud);
+        }
+
+        if (['pond', 'lake', 'swamp'].includes(loc.id)) {
+            const leafTimer = this.scene.time.addEvent({
+                delay: 4000,
+                loop: true,
+                callback: () => {
+                    if (Phaser.Math.Between(0, 100) > 60) {
+                        const startX = Phaser.Math.Between(0, 1) === 0 ? -10 : GAME_WIDTH + 10;
+                        const endX = startX < 0 ? GAME_WIDTH + 20 : -20;
+                        const y = Phaser.Math.Between(HORIZON_Y + 10, GAME_HEIGHT - 20);
+                        const leaf = this.scene.add.rectangle(startX, y, 4, 2, loc.palette.fog, 0.6)
+                            .setDepth(DEPTH.WATER + 3);
+                        this.objects.push(leaf);
+                        this.scene.tweens.add({
+                            targets: leaf,
+                            x: endX,
+                            y: y + Phaser.Math.Between(-20, 20),
+                            angle: Phaser.Math.Between(-180, 180),
+                            duration: Phaser.Math.Between(15000, 25000),
+                            onComplete: () => { leaf.destroy(); this.objects = this.objects.filter(o => o !== leaf); }
+                        });
+                    }
+                }
+            });
+            this.timers.push(leafTimer);
+        }
+
+        // TimerEvent.delay is read-only in Phaser 4, so a randomized repeat interval
+        // is done via a self-rescheduling one-shot timer rather than `loop: true`.
+        const scheduleBird = () => {
+            const birdTimer = this.scene.time.delayedCall(Phaser.Math.Between(8000, 15000), () => {
+                spawnBird();
+                scheduleBird();
+            });
+            this.timers.push(birdTimer);
+        };
+        const spawnBird = () => {
+                const startX = Phaser.Math.Between(0, 1) === 0 ? -20 : GAME_WIDTH + 20;
+                const endX = startX < 0 ? GAME_WIDTH + 50 : -50;
+                const y = Phaser.Math.Between(HORIZON_Y * 0.2, HORIZON_Y * 0.6);
+                
+                const g = this.scene.add.graphics({ x: startX, y });
+                g.lineStyle(2, 0x111111, 0.4);
+                g.beginPath();
+                g.moveTo(-6, -4);
+                g.lineTo(0, 0);
+                g.lineTo(6, -4);
+                g.strokePath();
+                g.setDepth(DEPTH.BG_FAR + 2);
+                this.objects.push(g);
+                
+                this.scene.tweens.add({
+                    targets: g,
+                    scaleY: 0.2,
+                    duration: 300,
+                    yoyo: true,
+                    repeat: -1
+                });
+                this.scene.tweens.add({
+                    targets: g,
+                    x: endX,
+                    y: y + Phaser.Math.Between(-40, 40),
+                    duration: Phaser.Math.Between(8000, 14000),
+                    onComplete: () => { g.destroy(); this.objects = this.objects.filter(o => o !== g); }
+                });
+        };
+        scheduleBird();
+
+        if (['pond', 'lake', 'river', 'coast'].includes(loc.id)) {
+            const rayRnd = new Phaser.Math.RandomDataGenerator([loc.id + 'rays']);
+            for (let i = 0; i < 3; i++) {
+                const ray = this.scene.add.rectangle(
+                    rayRnd.between(100, GAME_WIDTH - 100),
+                    HORIZON_Y * 0.5,
+                    rayRnd.between(60, 150),
+                    HORIZON_Y * 1.5,
+                    0xffffff,
+                    rayRnd.realInRange(0.02, 0.06)
+                ).setAngle(rayRnd.between(15, 35))
+                 .setDepth(DEPTH.BG_FAR + 2)
+                 .setBlendMode(Phaser.BlendModes.ADD);
+                
+                this.scene.tweens.add({
+                    targets: ray,
+                    alpha: ray.alpha * 1.8,
+                    duration: rayRnd.between(4000, 8000),
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.inOut'
+                });
+                this.objects.push(ray);
+            }
+        }
+
         if (loc.props.includes('fireflies')) {
             const emitter = this.scene.add.particles(0, 0, 'particle-spark', {
                 x: { min: 0, max: GAME_WIDTH }, y: { min: HORIZON_Y - 40, max: HORIZON_Y + 120 },
@@ -169,6 +357,13 @@ export class LocationRenderer {
         this.waterTiles.forEach((ts, i) => {
             ts.tilePositionX += deltaMs * 0.012 * (i === 0 ? 1 : -0.7);
             ts.tilePositionY = Math.sin(this.time * 0.0003 + i) * 2;
+            
+            ts.scaleY = 1.0 + Math.sin(this.time * 0.001 + i) * 0.05;
+            
+            const baseAlpha = ts.getData('baseAlpha');
+            if (baseAlpha !== undefined) {
+                ts.alpha = baseAlpha + Math.sin(this.time * 0.0008 + i * 2) * (baseAlpha * 0.3);
+            }
         });
     }
 

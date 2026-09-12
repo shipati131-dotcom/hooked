@@ -46,7 +46,7 @@ export class SettingsScene extends Phaser.Scene {
         y += 110;
 
         sheet.content.add(this.add.text(left + 60, y, 'Danger Zone', {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '20px', color: '#c24b3d'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '20px', color: '#c24b3d', fontStyle: '700'
         }));
         y += 40;
 

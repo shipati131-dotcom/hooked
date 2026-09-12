@@ -19,7 +19,10 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     backgroundColor: COLORS_BG,
     scale: {
         mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: GAME_WIDTH,
+        height: GAME_HEIGHT,
+        expandParent: true
     },
     input: {
         activePointers: 2

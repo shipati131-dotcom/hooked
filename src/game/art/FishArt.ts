@@ -7,10 +7,29 @@ const CX = W * 0.42;
 const CY = H * 0.5;
 
 /**
+ * Every species listed here has a real illustrated sprite preloaded by BootScene
+ * under the texture key `fish-${id}` (see public/visual-game-assets/sprites/fish/*.png).
+ * generateFishTexture() below is only a fallback for any species NOT in this
+ * list -- it no-ops as soon as a texture already exists under that key, so a
+ * preloaded sprite always wins over the procedural silhouette.
+ */
+export const SPECIES_WITH_REAL_ART = new Set<string>([
+    'bluegill', 'minnow', 'perch', 'carp', 'bass', 'moonlit-koi',
+    'crappie', 'walleye', 'trout', 'catfish', 'muskie', 'pinewood-phantom',
+    'grayling', 'char', 'golden-trout', 'pike', 'sturgeon', 'river-spirit',
+    'gar', 'bowfin', 'snapper', 'greenland-eel', 'bog-lantern', 'old-whiskers',
+    'clownfish', 'snapper-red', 'mahi', 'barracuda', 'sailfish', 'sunscale-ray',
+    'cod', 'halibut', 'tuna', 'swordfish', 'marlin', 'aurora-eel',
+    'arctic-char', 'ice-perch', 'greenland-shark', 'shark', 'frostfin-wyrm', 'aurora-wraith',
+    'ember-goby', 'obsidian-bass', 'magma-eel', 'cinder-ray', 'phoenix-fin', 'emberwhale',
+    'anglerfish', 'oarfish', 'giant-grouper', 'void-barracuda', 'ancient-coelacanth', 'eternal-leviathan'
+]);
+
+/**
  * Draws a stylized side-view fish silhouette for a texture key. A small set of
  * body-shape primitives (round/long/flat/eel/shark/sword/koi/angler/fantasy) is
  * reused across every species -- variety comes from color and pattern, not from
- * one-off unique art, which keeps quality consistent across ~48 species.
+ * one-off unique art. Only used as a fallback for species without real art above.
  */
 export function generateFishTexture(scene: Phaser.Scene, key: string, art: FishArtSpec): void {
     if (scene.textures.exists(key)) return;

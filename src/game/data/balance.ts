@@ -43,8 +43,14 @@ export const BALANCE = {
         nibbleChance: 0.55,
         maxNibbles: 2,
         hookWindowMs: 1400,
-        tutorialCatchCount: 3,
-        tutorialScale: 0.5,
+        // The reel minigame starts at `tutorialScale` difficulty (for a brand
+        // new player still learning to hold/release/manage tension) and
+        // ramps smoothly up to full difficulty by `tutorialRampCatches`
+        // total catches -- a gradual climb rather than a hard cliff, so
+        // nothing suddenly gets harder overnight right as a player is
+        // getting comfortable.
+        tutorialScale: 0.45,
+        tutorialRampCatches: 8,
         hugeRarityThreshold: 'epic' as Rarity,
         hugeWeightPercentile: 0.9
     },
@@ -57,11 +63,18 @@ export const BALANCE = {
         maxVelocity: 950,
         bounceDamp: 0.35,
         trackPadding: 40,
-        meterStart: 0.3,
-        fillRatePerSec: 0.34, // * reel.captureSpeed
+        meterStart: 0.18,
+        fillRatePerSec: 0.27, // * reel.captureSpeed
         drainRatePerSec: 0.20, // reduced by line quality
         tensionBuildPerSec: 0.28,
         tensionDecayPerSec: 0.4,
+        surgeMinDelaySec: 2.6,
+        surgeMaxDelaySec: 4.4,
+        surgeDurationSec: 1.15,
+        recoveryDurationSec: 0.8,
+        surgeTensionBuildPerSec: 0.72,
+        slackTensionDecayPerSec: 0.92,
+        recoveryFillBonus: 0.18,
         tensionThresholdWeightRatio: 0.6, // fish weight / line.maxTension ratio above which tension bar appears
         fishBaseSpeed: 90,
         fishSpeedPerDifficulty: 22,

@@ -3,6 +3,7 @@ import { GameBus } from '../core/GameState';
 import { EVENTS } from '../core/events';
 import { BALANCE } from '../data/balance';
 import { CHALLENGE_TEMPLATES } from '../data/challenges';
+import { FISH, getFish } from '../data/fish';
 import type { ActiveChallenge } from '../data/types';
 import type { CatchResult } from '../core/events';
 import { RARITY_ORDER, RARITY_LABEL, type Rarity } from '../constants';
@@ -20,7 +21,18 @@ export class ChallengeSystem {
         private awardXp: (n: number) => void,
         private r: Rng = defaultRng
     ) {
+        this.repairBrokenSpeciesChallenges();
         this.ensureFilled();
+    }
+
+    /** One-time repair for saves generated before the catchSpecies bug fix:
+     *  those challenges have no `extra` species, so they could never be
+     *  completed. Drop them so ensureFilled() replaces them with valid ones. */
+    private repairBrokenSpeciesChallenges(): void {
+        const broken = (c: ActiveChallenge) => !c.completed && c.goal === 'catchSpecies' && !c.extra;
+        if (this.save.activeChallenges.some(broken)) {
+            this.save.activeChallenges = this.save.activeChallenges.filter(c => !broken(c));
+        }
     }
 
     private ensureFilled(): void {
@@ -36,12 +48,25 @@ export class ChallengeSystem {
         const [lo, hi] = template.targetRange;
         const target = Math.max(1, Math.round(this.r.range(lo, hi) * Math.min(3, scale)));
         let extra: string | undefined;
+        let label: string | undefined;
         if (template.goal === 'catchRarityAtLeast') {
             extra = this.r.pick(template.extraPool ?? ['rare']);
+            label = RARITY_LABEL[extra as Rarity] ?? extra;
+        } else if (template.goal === 'catchSpecies') {
+            // Bug fix: this previously never set `extra`, so `onCatch`'s
+            // `c.extra === result.fish.id` check could never match and the
+            // challenge could never complete. Pick a species the player can
+            // actually encounter at an unlocked location.
+            const available = FISH.filter(f => f.locations.some(loc => this.save.unlockedLocations.includes(loc)));
+            // Bias toward common/uncommon species so "catch N of X" stays realistic
+            // rather than occasionally demanding N legendaries by pure bad luck.
+            const common = available.filter(f => f.rarity === 'common' || f.rarity === 'uncommon');
+            const pool = common.length > 0 ? common : available.length > 0 ? available : FISH;
+            extra = this.r.pick(pool).id;
+            label = getFish(extra).name;
         }
         const rewardCoins = Math.round(template.rewardCoinsPer * target * (template.goal === 'earnCoins' ? 1 : 4));
         const rewardXp = Math.round(template.rewardXpPer * target * (template.goal === 'earnCoins' ? 1 : 4));
-        const label = extra ? RARITY_LABEL[extra as Rarity] ?? extra : undefined;
         return {
             id: `${template.id}-${Date.now()}-${Math.floor(this.r.next() * 10000)}`,
             templateId: template.id,

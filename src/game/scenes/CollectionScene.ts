@@ -10,6 +10,7 @@ import { getLocation } from '../data/locations';
 import { generateFishTexture } from '../art/FishArt';
 import { applyRarityGlow } from '../ui/glow';
 import { formatWeight, formatCoins } from '../utils/format';
+import { fitImage } from '../ui/fitImage';
 
 export class CollectionScene extends Phaser.Scene {
     private list!: ScrollList;
@@ -25,7 +26,7 @@ export class CollectionScene extends Phaser.Scene {
         const top = GAME_HEIGHT / 2 - sheet.height / 2;
 
         this.countText = this.add.text(left + sheet.width - 220, top + 44, '', {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#e7b94f'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#e7b94f', fontStyle: '700'
         }).setOrigin(0, 0.5);
         sheet.content.add(this.countText);
 
@@ -60,12 +61,13 @@ export class CollectionScene extends Phaser.Scene {
         bg.fillRoundedRect(0, 4, 620, 66, 12);
         c.add(bg);
 
-        const icon = this.add.image(46, 37, `fish-${fish.id}`).setScale(0.55);
+        const icon = this.add.image(46, 37, `fish-${fish.id}`);
+        fitImage(icon, 72, 48);
         if (discovered) applyRarityGlow(icon, fish.rarity); else icon.setTint(0x1a1a1a).setAlpha(0.55);
         c.add(icon);
 
         const name = this.add.text(92, 18, discovered ? fish.name : '???', {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '19px', color: discovered ? '#f4e8cf' : '#5a6a70'
+            fontFamily: 'Fredoka, sans-serif', fontSize: '19px', color: discovered ? '#f4e8cf' : '#5a6a70', fontStyle: '700'
         });
         const rarityColor = RARITY_COLOR[fish.rarity];
         const sub = this.add.text(92, 44, discovered ? `${RARITY_LABEL[fish.rarity]} • ${getLocation(fish.locations[0]).name}` : 'Undiscovered', {
@@ -90,11 +92,12 @@ export class CollectionScene extends Phaser.Scene {
         panel.fillRoundedRect(0, 0, 500, 480, 16);
         this.detailContainer.add(panel);
 
-        const icon = this.add.image(250, 130, `fish-${fish.id}`).setScale(1.6);
+        const icon = this.add.image(250, 130, `fish-${fish.id}`);
+        fitImage(icon, 360, 176);
         if (discovered) applyRarityGlow(icon, fish.rarity); else icon.setTint(0x1a1a1a).setAlpha(0.5);
         this.detailContainer.add(icon);
 
-        const name = this.add.text(30, 230, discovered ? fish.name : '???', { fontFamily: 'Fredoka, sans-serif', fontSize: '30px', color: '#f4e8cf' });
+        const name = this.add.text(30, 230, discovered ? fish.name : '???', { fontFamily: 'Fredoka, sans-serif', fontSize: '30px', color: '#f4e8cf', fontStyle: '700' });
         const rarity = this.add.text(30, 270, RARITY_LABEL[fish.rarity], { fontFamily: 'Nunito, sans-serif', fontSize: '16px', color: '#' + RARITY_COLOR[fish.rarity].toString(16).padStart(6, '0'), fontStyle: '800' });
         this.detailContainer.add([name, rarity]);
 

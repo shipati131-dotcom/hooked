@@ -5,7 +5,7 @@ import { LocationRenderer, HORIZON_Y } from '../art/LocationRenderer';
 import { generateFishTexture } from '../art/FishArt';
 import { getLocation } from '../data/locations';
 import { getEquipment } from '../data/equipment';
-import { FishingSystem, TRACK_HEIGHT, type CastContext, type ReelSnapshot } from '../systems/FishingSystem';
+import { FishingSystem, type CastContext, type ReelSnapshot } from '../systems/FishingSystem';
 import type { RolledFish } from '../systems/FishGenerator';
 import { ReelMeter } from '../ui/ReelMeter';
 import { CatchCard } from '../ui/CatchCard';
@@ -15,10 +15,40 @@ import { BALANCE } from '../data/balance';
 import { fishForLocation } from '../data/fish';
 import { COLORS } from '../ui/theme';
 
-const ROD_ANCHOR = { x: 130, y: GAME_HEIGHT - 60 };
+// The rod is completely static -- one fixed pose (angled to read as nearly
+// vertical) at one fixed position, close to the left edge. It never rotates,
+// bends, or slides; only the line and bobber travel to wherever the player
+// casts.
+const ROD_ANCHOR_Y = GAME_HEIGHT - 90;
+const ROD_FIXED_X = GAME_WIDTH * 0.25;
+// Bigger overall, and stretched a bit wider than tall on top of that so the
+// pole itself reads as thicker (not just scaled up uniformly).
+const ROD_DISPLAY_W = 520;
+const ROD_DISPLAY_H = 320;
+const ROD_ANGLE_DEG = -47;
+// The rod-vintage art is drawn diagonally within its own frame (handle at the
+// bottom-left origin, tip near the top-right corner). At the ORIGINAL display
+// size this constant was measured against (340x225), the tip sits at local
+// angle -33.5 deg, length ~384 (measured from the source image's opaque
+// pixels). ROD_DISPLAY_W/H have since changed independently of each other
+// (for the "thicker" stretch), so the local tip vector is rescaled by the
+// same non-uniform x/y factors before the fixed ROD_ANGLE_DEG rotation is
+// applied to it -- that keeps the line glued to the tip at any size.
+const ROD_TIP_MEASURED_AT = { w: 340, h: 225 };
+const ROD_TIP_LOCAL = { length: 384, angleDeg: -33.5 };
+const ROD_TIP_SCALE_X = ROD_DISPLAY_W / ROD_TIP_MEASURED_AT.w;
+const ROD_TIP_SCALE_Y = ROD_DISPLAY_H / ROD_TIP_MEASURED_AT.h;
+const ROD_TIP_LOCAL_RAD = Phaser.Math.DegToRad(ROD_TIP_LOCAL.angleDeg);
+const ROD_TIP_LOCAL_X = Math.cos(ROD_TIP_LOCAL_RAD) * ROD_TIP_LOCAL.length * ROD_TIP_SCALE_X;
+const ROD_TIP_LOCAL_Y = Math.sin(ROD_TIP_LOCAL_RAD) * ROD_TIP_LOCAL.length * ROD_TIP_SCALE_Y;
+const ROD_ROT_RAD = Phaser.Math.DegToRad(ROD_ANGLE_DEG);
+const ROD_TIP_OFFSET = {
+    x: ROD_TIP_LOCAL_X * Math.cos(ROD_ROT_RAD) - ROD_TIP_LOCAL_Y * Math.sin(ROD_ROT_RAD),
+    y: ROD_TIP_LOCAL_X * Math.sin(ROD_ROT_RAD) + ROD_TIP_LOCAL_Y * Math.cos(ROD_ROT_RAD)
+};
 const CAST_Y = HORIZON_Y + 130;
-const REEL_METER_X = GAME_WIDTH * 0.8;
-const REEL_METER_Y = GAME_HEIGHT - 90;
+const REEL_METER_X = GAME_WIDTH * 0.5;
+const REEL_METER_Y = 145;
 
 export class FishingScene extends Phaser.Scene {
     private env!: LocationRenderer;
@@ -26,20 +56,20 @@ export class FishingScene extends Phaser.Scene {
     private reelMeter!: ReelMeter;
     private catchCard!: CatchCard;
 
-    private rodGfx!: Phaser.GameObjects.Graphics;
+    private rodSprite!: Phaser.GameObjects.Image;
     private lineGfx!: Phaser.GameObjects.Graphics;
     private bobber!: Phaser.GameObjects.Image;
-    private bobberCap!: Phaser.GameObjects.Image;
     private promptText!: Phaser.GameObjects.Text;
     private hugeBanner!: Phaser.GameObjects.Text;
 
     private bobberX = GAME_WIDTH * 0.5;
     private bobberY = CAST_Y;
-    private rodBend = 0; // 0..1
     private isPointerDown = false;
     private resultCardOpen = false;
-    private rodTipX = ROD_ANCHOR.x + 60;
-    private rodTipY = ROD_ANCHOR.y - 300;
+    private rodTipX = 0;
+    private rodTipY = 0;
+    private reelSoundTimer = 0;
+    private reelAnimTime = 0;
 
     constructor() { super(SCENE_KEYS.FISHING); }
 
@@ -55,10 +85,16 @@ export class FishingScene extends Phaser.Scene {
             generateFishTexture(this, `fish-${f.id}`, f.art);
         }
 
-        this.rodGfx = this.add.graphics().setDepth(DEPTH.ROD);
+        this.rodSprite = this.add.image(ROD_FIXED_X, ROD_ANCHOR_Y, 'rod-vintage')
+            .setOrigin(0.025, 0.95)
+            .setDisplaySize(ROD_DISPLAY_W, ROD_DISPLAY_H)
+            .setAngle(ROD_ANGLE_DEG)
+            .setDepth(DEPTH.ROD);
         this.lineGfx = this.add.graphics().setDepth(DEPTH.LINE);
-        this.bobber = this.add.image(this.bobberX, this.bobberY, 'bobber').setDepth(DEPTH.BOBBER).setVisible(false);
-        this.bobberCap = this.add.image(this.bobberX, this.bobberY, 'bobber-cap').setDepth(DEPTH.BOBBER + 1).setVisible(false);
+        this.bobber = this.add.image(this.bobberX, this.bobberY, 'bobber-art')
+            .setScale(0.044)
+            .setDepth(DEPTH.BOBBER)
+            .setVisible(false);
         this.applyBobberSkin();
 
         this.reelMeter = new ReelMeter(this, REEL_METER_X, REEL_METER_Y);
@@ -66,12 +102,14 @@ export class FishingScene extends Phaser.Scene {
         this.catchCard = new CatchCard(this);
 
         this.promptText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.78, 'Click the water to cast', {
-            fontFamily: 'Nunito, sans-serif', fontSize: '24px', color: '#f4e8cf', fontStyle: '700'
+            fontFamily: 'Nunito, sans-serif', fontSize: '26px', color: '#f4e8cf', fontStyle: '700',
+            stroke: '#07161d', strokeThickness: 4
         }).setOrigin(0.5).setDepth(DEPTH.UI_TOP).setAlpha(0.85);
         this.tweens.add({ targets: this.promptText, alpha: 0.4, duration: 900, yoyo: true, repeat: -1 });
 
         this.hugeBanner = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.22, 'Something HUGE is on the line!', {
-            fontFamily: 'Fredoka, sans-serif', fontSize: '38px', color: '#e8754f', stroke: '#17252b', strokeThickness: 6
+            fontFamily: 'Fredoka, sans-serif', fontSize: '42px', color: '#e8754f', fontStyle: '700',
+            stroke: '#17252b', strokeThickness: 7
         }).setOrigin(0.5).setDepth(DEPTH.UI_TOP).setVisible(false).setAlpha(0);
 
         this.drawRod();
@@ -155,18 +193,15 @@ export class FishingScene extends Phaser.Scene {
         const ctx = this.buildCastContext(services);
         const clampedX = Phaser.Math.Clamp(targetX, 220, GAME_WIDTH - 100);
         this.fishing.startCast(ctx, clampedX);
+        this.drawRod(); // recompute rodTipX/Y immediately so the cast launches from the tip
 
         services.audio.play('cast');
-        this.rodBend = 0.35;
-        this.tweens.add({ targets: this, rodBend: 0, duration: 260, ease: 'Sine.easeOut' });
 
         // bobber flies from the rod tip to the target on a gentle arc
         this.bobber.setVisible(true).setAlpha(1);
-        this.bobberCap.setVisible(true).setAlpha(1);
-        const startX = ROD_ANCHOR.x + 40, startY = ROD_ANCHOR.y - 260;
+        const startX = this.rodTipX, startY = this.rodTipY;
         this.bobberX = startX; this.bobberY = startY;
         this.bobber.setPosition(startX, startY);
-        this.bobberCap.setPosition(startX, startY);
 
         const flightTime = 480;
         const flight = { t: 0 };
@@ -179,12 +214,10 @@ export class FishingScene extends Phaser.Scene {
                 const y = Phaser.Math.Linear(startY, CAST_Y, t) - arcHeight;
                 this.bobberX = x; this.bobberY = y;
                 this.bobber.setPosition(x, y);
-                this.bobberCap.setPosition(x, y - 2);
             },
             onComplete: () => {
                 this.bobberY = CAST_Y;
                 this.bobber.setPosition(clampedX, CAST_Y);
-                this.bobberCap.setPosition(clampedX, CAST_Y - 2);
                 this.splash(clampedX, CAST_Y);
                 services.audio.play('splash');
                 this.fishing.onSplashLanded();
@@ -211,7 +244,6 @@ export class FishingScene extends Phaser.Scene {
 
     private onIdleReturn(): void {
         this.bobber.setVisible(false);
-        this.bobberCap.setVisible(false);
         this.promptText.setVisible(true).setAlpha(0.85);
     }
 
@@ -220,7 +252,7 @@ export class FishingScene extends Phaser.Scene {
     private bindFishingEvents(services: ReturnType<typeof getServices>): void {
         this.fishing.on('nibble', () => {
             services.audio.play('nibble');
-            this.tweens.add({ targets: [this.bobber, this.bobberCap], y: '+=10', duration: 90, yoyo: true, ease: 'Sine.easeOut' });
+            this.tweens.add({ targets: this.bobber, y: '+=10', duration: 90, yoyo: true, ease: 'Sine.easeOut' });
         });
 
         this.fishing.on('huge', () => {
@@ -230,13 +262,11 @@ export class FishingScene extends Phaser.Scene {
         this.fishing.on('bite', (..._args: unknown[]) => {
             services.audio.play('bite');
             this.cameras.main.shake(160, 0.006);
-            this.rodBend = 1;
-            this.tweens.add({ targets: this, rodBend: 0.15, duration: 220, ease: 'Back.easeOut' });
-            this.tweens.add({ targets: [this.bobber, this.bobberCap], y: '+=26', duration: 140, ease: 'Sine.easeIn', yoyo: true });
+            this.tweens.add({ targets: this.bobber, y: '+=26', duration: 140, ease: 'Sine.easeIn', yoyo: true });
             // bobber compresses under the strike, then pops back -- a squash/stretch beat
             this.tweens.add({
-                targets: [this.bobber, this.bobberCap], scaleY: 0.55, scaleX: 1.35, duration: 90, ease: 'Sine.easeOut',
-                onComplete: () => this.tweens.add({ targets: [this.bobber, this.bobberCap], scaleY: 1, scaleX: 1, duration: 220, ease: 'Elastic.easeOut', easeParams: [1, 0.6] })
+                targets: this.bobber, scaleY: 0.024, scaleX: 0.059, duration: 90, ease: 'Sine.easeOut',
+                onComplete: () => this.tweens.add({ targets: this.bobber, scaleY: 0.044, scaleX: 0.044, duration: 220, ease: 'Elastic.easeOut', easeParams: [1, 0.6] })
             });
             floatingText(this, this.bobberX, this.bobberY - 60, '!', '#f5c451', 44);
         });
@@ -244,11 +274,9 @@ export class FishingScene extends Phaser.Scene {
         this.fishing.on('reelStart', (...args: unknown[]) => {
             const rolled = args[0] as RolledFish;
             this.bobber.setVisible(false);
-            this.bobberCap.setVisible(false);
-            this.rodBend = 0.5;
             const key = `fish-${rolled.fish.id}`;
             generateFishTexture(this, key, rolled.fish.art);
-            this.reelMeter.beginEncounter(key, rolled.fish.rarity);
+            this.reelMeter.beginEncounter(key, rolled.fish.rarity, rolled.fish.name);
         });
 
         this.fishing.on('reelSuccess', (...args: unknown[]) => {
@@ -262,7 +290,6 @@ export class FishingScene extends Phaser.Scene {
         });
 
         this.fishing.on('missedHook', () => {
-            this.rodBend = 0;
             this.onIdleReturn();
         });
     }
@@ -302,7 +329,6 @@ export class FishingScene extends Phaser.Scene {
             this.resultCardOpen = false;
             this.catchCard.hide();
             services.finalizeCatch(result);
-            this.rodBend = 0;
             this.onIdleReturn();
         });
     }
@@ -315,7 +341,6 @@ export class FishingScene extends Phaser.Scene {
         const pct = Math.round(meter * 100);
         floatingText(this, GAME_WIDTH / 2, GAME_HEIGHT * 0.4,
             lineSnapped ? 'The line snapped!' : `It got away… (so close: ${pct}%)`, '#e8a08c', 26);
-        this.rodBend = 0;
         this.onIdleReturn();
         services.requestSave();
     }
@@ -329,7 +354,20 @@ export class FishingScene extends Phaser.Scene {
         if (this.fishing.state === 'reeling') {
             const snap: ReelSnapshot = this.fishing.snapshot();
             this.reelMeter.update(snap);
-            this.rodBend = Phaser.Math.Clamp(0.3 + (1 - snap.meter) * 0.4 + snap.tension * 0.3, 0, 1);
+
+            // Accumulate reel animation time
+            this.reelAnimTime += dt / 1000;
+
+            // Play reel-crank sound at intervals while actively holding (reeling in)
+            this.reelSoundTimer += dt;
+            if (this.isPointerDown && this.reelSoundTimer >= 160) {
+                this.reelSoundTimer = 0;
+                const services = getServices(this);
+                services.audio.play('reel-crank');
+            }
+        } else {
+            this.reelSoundTimer = 0;
+            this.reelAnimTime = 0;
         }
 
         this.drawRod();
@@ -337,34 +375,29 @@ export class FishingScene extends Phaser.Scene {
     }
 
     private drawRod(): void {
-        this.rodGfx.clear();
-        const baseX = ROD_ANCHOR.x, baseY = ROD_ANCHOR.y;
-        const tipX = baseX + 60 - this.rodBend * 40;
-        const tipY = baseY - 300 + this.rodBend * 60;
-        const midX = baseX + 30 - this.rodBend * 60;
-        const midY = baseY - 160;
+        const isReeling = this.fishing.state === 'reeling';
 
-        this.rodGfx.lineStyle(10, 0x6a4a30, 1);
-        this.rodGfx.beginPath();
-        this.rodGfx.moveTo(baseX, baseY);
-        this.rodGfx.lineTo(midX, midY);
-        this.rodGfx.strokePath();
-        this.rodGfx.lineStyle(7, 0x8a6a40, 1);
-        this.rodGfx.beginPath();
-        this.rodGfx.moveTo(midX, midY);
-        this.rodGfx.lineTo(tipX, tipY);
-        this.rodGfx.strokePath();
+        // The rod never moves horizontally (or at all) -- it stays pinned to
+        // ROD_FIXED_X for the entire scene.
+        this.rodSprite.setPosition(ROD_FIXED_X, ROD_ANCHOR_Y);
 
-        this.rodTipX = tipX;
-        this.rodTipY = tipY;
+        // Subtle scale pulse while reeling for "alive" feel. Applied via setDisplaySize
+        // (not setScale) so it multiplies the configured ROD_DISPLAY_W/H rather than
+        // fighting with it -- setScale(1) here would otherwise reset the sprite back
+        // to its full native texture size every frame.
+        const scalePulse = isReeling ? 1 + Math.sin(this.reelAnimTime * 4.0) * 0.008 : 1;
+        this.rodSprite.setDisplaySize(ROD_DISPLAY_W * scalePulse, ROD_DISPLAY_H * scalePulse);
+
+        this.rodTipX = ROD_FIXED_X + ROD_TIP_OFFSET.x * scalePulse;
+        this.rodTipY = ROD_ANCHOR_Y + ROD_TIP_OFFSET.y * scalePulse;
     }
 
     private drawLine(): void {
         this.lineGfx.clear();
         const targetVisible = this.bobber.visible || this.fishing.state === 'reeling';
         if (!targetVisible) return;
-        const targetX = this.fishing.state === 'reeling' ? REEL_METER_X : this.bobberX;
-        const targetY = this.fishing.state === 'reeling' ? REEL_METER_Y - TRACK_HEIGHT * 0.15 : this.bobberY;
+        const targetX = this.fishing.state === 'reeling' ? REEL_METER_X - 470 : this.bobberX;
+        const targetY = this.fishing.state === 'reeling' ? REEL_METER_Y + 365 : this.bobberY;
 
         const services = getServices(this);
         const lineColor = services.equipment.getLoadout().line.color;
@@ -393,7 +426,7 @@ export class FishingScene extends Phaser.Scene {
         const services = getServices(this);
         const bobberDef = getEquipment(services.save.equipped.bobber);
         const stats = bobberDef.stats as { skinColor: number };
-        this.bobberCap.setTint(stats.skinColor);
+        this.bobber.setTint(stats.skinColor);
     }
 
     private shutdownScene(): void {

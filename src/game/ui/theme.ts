@@ -30,9 +30,10 @@ export function displayStyle(size: number, color = '#f4e8cf'): Phaser.Types.Game
         fontFamily: FONT_DISPLAY,
         fontSize: `${size}px`,
         color,
+        fontStyle: '700',
         stroke: '#17252b',
-        strokeThickness: Math.max(2, Math.round(size / 9)),
-        shadow: { offsetX: 0, offsetY: Math.max(2, size / 14), color: '#00000055', blur: 4, fill: true }
+        strokeThickness: Math.max(3, Math.round(size / 7)),
+        shadow: { offsetX: 0, offsetY: Math.max(2, size / 12), color: '#00000066', blur: 5, fill: true }
     };
 }
 
@@ -41,7 +42,9 @@ export function bodyStyle(size: number, color = '#e7f0ee'): Phaser.Types.GameObj
         fontFamily: FONT_BODY,
         fontSize: `${size}px`,
         color,
-        fontStyle: '600'
+        fontStyle: '700',
+        stroke: '#07161d',
+        strokeThickness: Math.max(1, Math.round(size / 14))
     };
 }
 

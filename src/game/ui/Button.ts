@@ -8,6 +8,9 @@ export interface ButtonOptions {
     textColor?: string;
     fontSize?: number;
     disabled?: boolean;
+    iconKey?: string;
+    iconSize?: number;
+    iconGap?: number;
 }
 
 /** A chunky carved-plaque button (not a stadium pill) with a bottom "lip" that presses down on click, plus hover scale. */
@@ -19,6 +22,7 @@ export class Button extends Phaser.GameObjects.Container {
     private color: number;
     private disabled: boolean;
     private onClick?: () => void;
+    private icon?: Phaser.GameObjects.Image;
 
     constructor(scene: Phaser.Scene, x: number, y: number, text: string, onClick?: () => void, opts: ButtonOptions = {}) {
         super(scene, x, y);
@@ -31,12 +35,23 @@ export class Button extends Phaser.GameObjects.Container {
         this.bg = scene.add.graphics();
         this.label = scene.add.text(0, -3, text, {
             fontFamily: 'Fredoka, sans-serif',
-            fontSize: `${opts.fontSize ?? 24}px`,
+            fontSize: `${opts.fontSize ?? 26}px`,
             color: opts.textColor ?? '#17252b',
-            fontStyle: '600'
+            fontStyle: '700',
+            stroke: '#00000022',
+            strokeThickness: 1
         }).setOrigin(0.5);
 
-        this.add([this.bg, this.label]);
+        if (opts.iconKey) {
+            const iconSize = opts.iconSize ?? 19;
+            const gap = opts.iconGap ?? 8;
+            const groupW = iconSize + gap + this.label.width;
+            this.icon = scene.add.image(-groupW / 2 + iconSize / 2, -3, opts.iconKey)
+                .setDisplaySize(iconSize, iconSize);
+            this.label.setX(this.icon.x + iconSize / 2 + gap + this.label.width / 2);
+        }
+
+        this.add(this.icon ? [this.bg, this.icon, this.label] : [this.bg, this.label]);
         this.redraw(false);
         this.setSize(this.boxW, this.boxH);
         this.setInteractive({ useHandCursor: !this.disabled });
@@ -87,13 +102,15 @@ export class Button extends Phaser.GameObjects.Container {
             g.strokeRoundedRect(-w / 2 + 2, -h / 2 + 2, w - 4, h - lip - 4, Math.max(2, r - 2));
         }
         this.label.setY(pressed ? -3 + 3 : -3);
+        this.icon?.setY(pressed ? 0 : -3);
         this.label.setAlpha(this.disabled ? 0.6 : 1);
+        this.icon?.setAlpha(this.disabled ? 0.6 : 1);
     }
 }
 
 export function pillLabel(scene: Phaser.Scene, x: number, y: number, text: string, color: number, textColor = '#17252b'): Phaser.GameObjects.Container {
     const c = scene.add.container(x, y);
-    const t = scene.add.text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '16px', color: textColor, fontStyle: '800' }).setOrigin(0.5);
+    const t = scene.add.text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '17px', color: textColor, fontStyle: '800' }).setOrigin(0.5);
     const g = scene.add.graphics();
     g.fillStyle(color, 1);
     g.fillRoundedRect(-t.width / 2 - 12, -t.height / 2 - 6, t.width + 24, t.height + 12, (t.height + 12) / 2);

@@ -6,6 +6,7 @@ import { formatWeight, formatCoins } from '../utils/format';
 import { countUpText } from './CountUpText';
 import { applyRarityGlow } from './glow';
 import { hex } from './theme';
+import { fitImage } from './fitImage';
 
 /** Per-rarity suspense delay (ms) before the reveal, and how much spectacle it earns. */
 const TEASER: Record<Rarity, { delay: number; line: string; burst: number; shake: number } | null> = {
@@ -36,6 +37,7 @@ export class CatchCard extends Phaser.GameObjects.Container {
     private hintText: Phaser.GameObjects.Text;
     private continueCb?: () => void;
     private pendingTimers: Phaser.Time.TimerEvent[] = [];
+    private fishScale = 1;
 
     constructor(scene: Phaser.Scene) {
         super(scene, GAME_WIDTH / 2, GAME_HEIGHT / 2);
@@ -46,7 +48,7 @@ export class CatchCard extends Phaser.GameObjects.Container {
         this.teaserText = scene.add.text(0, -30, '', {
             fontFamily: 'Nunito, sans-serif', fontSize: '20px', color: '#d8c9a3', fontStyle: '700italic'
         }).setOrigin(0.5).setAlpha(0);
-        this.rarityText = scene.add.text(0, -190, '', { fontFamily: 'Fredoka, sans-serif', fontSize: '23px', fontStyle: '600' }).setOrigin(0.5).setAlpha(0);
+        this.rarityText = scene.add.text(0, -190, '', { fontFamily: 'Fredoka, sans-serif', fontSize: '23px', fontStyle: '700' }).setOrigin(0.5).setAlpha(0);
         this.nameText = scene.add.text(0, -150, '', { fontFamily: 'Fredoka, sans-serif', fontSize: '42px', color: '#f4e8cf', stroke: '#17252b', strokeThickness: 6 }).setOrigin(0.5).setAlpha(0);
         this.weightText = scene.add.text(0, 10, '', { fontFamily: 'Fredoka, sans-serif', fontSize: '34px', color: '#f4e8cf', stroke: '#17252b', strokeThickness: 5 }).setOrigin(0.5).setAlpha(0);
         this.sizeText = scene.add.text(0, 48, '', { fontFamily: 'Nunito, sans-serif', fontSize: '20px', color: '#d8c9a3', fontStyle: '700' }).setOrigin(0.5).setAlpha(0);
@@ -90,7 +92,9 @@ export class CatchCard extends Phaser.GameObjects.Container {
         if (result.isNewRecord && !result.isNewSpecies) badges.push('NEW PERSONAL RECORD!');
         this.badgeText.setText(badges.join('   '));
 
-        this.fishImage.setTexture(fishTextureKey).setScale(0).setAngle(0).setTint(teaser ? 0x0a0a0a : 0xffffff);
+        this.fishImage.setTexture(fishTextureKey).setAngle(0).setTint(teaser ? 0x0a0a0a : 0xffffff);
+        this.fishScale = fitImage(this.fishImage, 360, 170);
+        this.fishImage.setScale(0);
 
         this.setVisible(true);
         this.setAlpha(0);
@@ -102,7 +106,7 @@ export class CatchCard extends Phaser.GameObjects.Container {
         playSfx(this.scene, 'catch');
         this.spawnBurst(0xdfeef2, 12, 0.35, 60, 240);
         this.scene.tweens.add({
-            targets: this.fishImage, scale: 2.05, angle: -8, y: -40, duration: 420, ease: 'Back.easeOut',
+            targets: this.fishImage, scale: this.fishScale, angle: -8, y: -40, duration: 420, ease: 'Back.easeOut',
             onComplete: () => {
                 this.scene.tweens.add({ targets: this.fishImage, angle: 6, duration: 260, yoyo: true, repeat: 3, ease: 'Sine.inOut' });
             }

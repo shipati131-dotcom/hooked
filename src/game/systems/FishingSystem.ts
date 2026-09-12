@@ -22,6 +22,11 @@ export interface ReelSnapshot {
     tension: number;
     tensionActive: boolean;
     inZone: boolean;
+    phase: 'control' | 'surge' | 'recovery';
+    phaseProgress: number;
+    combo: number;
+    holding: boolean;
+    surgesSurvived: number;
 }
 
 interface PatternConfig {
@@ -97,6 +102,12 @@ export class FishingSystem extends GameBus {
     tensionActive = false;
     neverLeftZone = true;
     perfectEligible = true;
+    battlePhase: 'control' | 'surge' | 'recovery' = 'control';
+    phaseElapsed = 0;
+    phaseDuration = 1;
+    combo = 0;
+    private lastHolding = false;
+    private surgesSurvived = 0;
 
     private pattern: PatternConfig = PATTERNS.calm;
     private fishSpeed = 60;
@@ -120,8 +131,9 @@ export class FishingSystem extends GameBus {
 
     private beginWait(ctx: CastContext): void {
         const bait = ctx.loadout.bait;
-        const speedMult = bait.biteSpeed * (1 + ctx.quickBiteBonus);
-        this.waitTarget = this.r.range(BALANCE.bite.minMs, BALANCE.bite.maxMs) / speedMult;
+        // Quick Bite's displayed percentage is a true wait-time reduction.
+        const waitMultiplier = clamp(1 - ctx.quickBiteBonus, 0.2, 1);
+        this.waitTarget = this.r.range(BALANCE.bite.minMs, BALANCE.bite.maxMs) * waitMultiplier / bait.biteSpeed;
         this.waitElapsed = 0;
         this.nibblesFired = 0;
         const nibbleCount = this.r.chance(BALANCE.bite.nibbleChance) ? this.r.int(1, BALANCE.bite.maxNibbles) : 0;
@@ -152,13 +164,11 @@ export class FishingSystem extends GameBus {
         this.state = 'bite';
         this.hookElapsed = 0;
         this.hookWindow = BALANCE.bite.hookWindowMs;
-        this.autoHook = ctx.totalCaught < BALANCE.bite.tutorialCatchCount;
+        // Hooking always requires a deliberate tap/click on the "!" -- no
+        // auto-hook, even during the early tutorial catches.
+        this.autoHook = false;
         if (isHuge) this.emit('huge', rolled.fish);
         this.emit('bite', rolled);
-        if (this.autoHook) {
-            // small delay so the bite visual reads before auto-hooking
-            this.hookElapsed = -220;
-        }
     }
 
     /** Player tapped during the bite window. */
@@ -170,8 +180,11 @@ export class FishingSystem extends GameBus {
     private beginReel(ctx: CastContext, enc: CastOutcomeFish): void {
         this.state = 'reeling';
         const { rolled } = enc;
-        const tutorial = ctx.totalCaught < BALANCE.bite.tutorialCatchCount;
-        const difficultyScale = tutorial ? BALANCE.bite.tutorialScale : 1;
+        // Gradual ramp from `tutorialScale` (brand new player) up to full
+        // difficulty by `tutorialRampCatches` total catches, instead of a
+        // hard cliff -- see BALANCE.bite for why.
+        const rampProgress = clamp(ctx.totalCaught / BALANCE.bite.tutorialRampCatches, 0, 1);
+        const difficultyScale = BALANCE.bite.tutorialScale + (1 - BALANCE.bite.tutorialScale) * rampProgress;
 
         this.pattern = PATTERNS[rolled.fish.movementPattern];
         this.lineMaxTension = ctx.loadout.line.maxTension;
@@ -207,6 +220,12 @@ export class FishingSystem extends GameBus {
         this.tensionActive = tensionRatio > BALANCE.minigame.tensionThresholdWeightRatio;
         this.neverLeftZone = true;
         this.perfectEligible = true;
+        this.battlePhase = 'control';
+        this.phaseElapsed = 0;
+        this.phaseDuration = this.r.range(BALANCE.minigame.surgeMinDelaySec, BALANCE.minigame.surgeMaxDelaySec);
+        this.combo = 0;
+        this.lastHolding = false;
+        this.surgesSurvived = 0;
 
         this.emit('reelStart', rolled);
     }
@@ -251,6 +270,26 @@ export class FishingSystem extends GameBus {
 
     private updateReeling(dtSec: number, holding: boolean): void {
         const b = BALANCE.minigame;
+        this.lastHolding = holding;
+
+        // The fight has a readable rhythm: control the fish, survive a telegraphed
+        // power surge by giving line, then capitalize on its brief recovery.
+        this.phaseElapsed += dtSec;
+        if (this.phaseElapsed >= this.phaseDuration) {
+            if (this.battlePhase === 'control') {
+                this.battlePhase = 'surge';
+                this.phaseDuration = b.surgeDurationSec;
+                this.fishTargetY = this.r.chance(0.5) ? TRACK_HEIGHT * 0.92 : TRACK_HEIGHT * 0.08;
+            } else if (this.battlePhase === 'surge') {
+                this.battlePhase = 'recovery';
+                this.phaseDuration = b.recoveryDurationSec;
+                this.surgesSurvived++;
+            } else {
+                this.battlePhase = 'control';
+                this.phaseDuration = this.r.range(b.surgeMinDelaySec, b.surgeMaxDelaySec);
+            }
+            this.phaseElapsed = 0;
+        }
 
         // --- catch zone physics ---
         this.zoneVelocity += (holding ? b.liftAccel : -b.gravity) * dtSec;
@@ -266,7 +305,8 @@ export class FishingSystem extends GameBus {
             this.pickFishTarget();
             this.fishRetargetTimer = this.r.range(this.pattern.retargetMin, this.pattern.retargetMax);
         }
-        const approach = 1 - Math.exp(-this.pattern.approachRate * this.fishSpeed * dtSec);
+        const phaseSpeed = this.battlePhase === 'surge' ? 1.75 : this.battlePhase === 'recovery' ? 0.42 : 1;
+        const approach = 1 - Math.exp(-this.pattern.approachRate * this.fishSpeed * phaseSpeed * dtSec);
         this.fishY += (this.fishTargetY - this.fishY) * approach;
         if (this.pattern.jitter) {
             this.fishY += (this.r.next() - 0.5) * this.pattern.jitter * this.fishSpeed * dtSec;
@@ -276,25 +316,41 @@ export class FishingSystem extends GameBus {
         // --- capture meter ---
         const inZone = this.fishY >= this.zoneY && this.fishY <= this.zoneY + this.zoneHeight;
         if (!inZone) { this.neverLeftZone = false; }
-        if (inZone) {
-            this.meter += b.fillRatePerSec * this.reelCaptureMult * dtSec;
+        if (this.battlePhase === 'surge') {
+            // Reeling into a surge is dangerous. Letting go gives the fish line and
+            // rapidly cools tension; progress is protected but cannot be gained.
+            if (holding) this.tension += (b.surgeTensionBuildPerSec / this.lineSnapResist) * dtSec;
+            else this.tension -= b.slackTensionDecayPerSec * dtSec;
+            this.combo = 0;
+        } else if (inZone) {
+            if (holding) {
+                const recoveryBonus = this.battlePhase === 'recovery' ? b.recoveryFillBonus : 0;
+                this.meter += (b.fillRatePerSec * this.reelCaptureMult + recoveryBonus) * dtSec;
+                this.combo = Math.min(5, this.combo + dtSec * 1.4);
+            } else {
+                // Releasing to reposition the control band should not erase good
+                // tracking; it simply stops the landing push until pressure returns.
+                this.combo = Math.max(0, this.combo - dtSec * 1.5);
+            }
         } else {
             this.meter -= (b.drainRatePerSec / this.lineSnapResist) * dtSec;
+            this.combo = Math.max(0, this.combo - dtSec * 3);
         }
         this.meter = clamp(this.meter, 0, 1);
+        if (this.surgesSurvived === 0) this.meter = Math.min(this.meter, 0.82);
 
         // --- tension ---
-        if (this.tensionActive) {
+        if (this.battlePhase !== 'surge' && this.tensionActive) {
             if (!inZone) this.tension += b.tensionBuildPerSec * dtSec;
             else this.tension -= b.tensionDecayPerSec * dtSec;
-            this.tension = clamp(this.tension, 0, 1);
         }
+        this.tension = clamp(this.tension, 0, 1);
 
         if (this.tensionActive && this.tension >= 1) {
             this.finishReel(false, true);
         } else if (this.meter >= 1) {
             this.finishReel(true, false);
-        } else if (this.meter <= 0) {
+        } else if (this.meter <= 0 && this.surgesSurvived > 0) {
             this.finishReel(false, false);
         }
     }
@@ -334,7 +390,12 @@ export class FishingSystem extends GameBus {
             meter: this.meter,
             tension: this.tension,
             tensionActive: this.tensionActive,
-            inZone: this.fishY >= this.zoneY && this.fishY <= this.zoneY + this.zoneHeight
+            inZone: this.fishY >= this.zoneY && this.fishY <= this.zoneY + this.zoneHeight,
+            phase: this.battlePhase,
+            phaseProgress: clamp(this.phaseElapsed / Math.max(0.001, this.phaseDuration), 0, 1),
+            combo: Math.floor(this.combo),
+            holding: this.lastHolding,
+            surgesSurvived: this.surgesSurvived
         };
     }
 

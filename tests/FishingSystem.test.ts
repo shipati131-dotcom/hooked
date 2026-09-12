@@ -52,9 +52,9 @@ describe('FishingSystem reeling physics', () => {
 
         for (let i = 0; i < 2000 && fs.state === 'reeling'; i++) {
             const snap = fs.snapshot();
-            // steer: hold when the fish is above the zone's center, release when below
+            // steer during control/recovery; give line during the fish's surge
             const zoneCenter = snap.zoneY + snap.zoneHeight / 2;
-            const holding = snap.fishY > zoneCenter;
+            const holding = snap.phase !== 'surge' && snap.fishY > zoneCenter;
             fs.update(16, holding);
         }
         expect(succeeded).toBe(true);
@@ -133,5 +133,45 @@ describe('FishingSystem reeling physics', () => {
             expect(snap.zoneY).toBeGreaterThanOrEqual(0);
             expect(snap.zoneY + snap.zoneHeight).toBeLessThanOrEqual(TRACK_HEIGHT + 0.001);
         }
+    });
+
+    it('turns a fish surge into a release-to-protect reaction', () => {
+        const fs = new FishingSystem();
+        driveToReeling(fs, makeCtx());
+        const internal = fs as unknown as {
+            phaseElapsed: number; phaseDuration: number; tension: number; tensionActive: boolean;
+        };
+        internal.phaseElapsed = 0;
+        internal.phaseDuration = 0.001;
+        internal.tension = 0.2;
+        internal.tensionActive = true;
+
+        fs.update(16, true);
+        expect(fs.snapshot().phase).toBe('surge');
+        const strained = fs.snapshot().tension;
+        expect(strained).toBeGreaterThan(0.2);
+
+        fs.update(200, false);
+        expect(fs.snapshot().tension).toBeLessThan(strained);
+    });
+
+    it('requires surviving at least one surge before the fish can be landed', () => {
+        const fs = new FishingSystem();
+        driveToReeling(fs, makeCtx());
+        const internal = fs as unknown as {
+            meter: number; zoneY: number; zoneHeight: number; fishY: number;
+            phaseElapsed: number; phaseDuration: number;
+        };
+        internal.meter = 0.81;
+        internal.zoneY = 0;
+        internal.zoneHeight = TRACK_HEIGHT;
+        internal.fishY = TRACK_HEIGHT / 2;
+        internal.phaseElapsed = 0;
+        internal.phaseDuration = 10;
+
+        fs.update(1000, true);
+        expect(fs.state).toBe('reeling');
+        expect(fs.snapshot().meter).toBeLessThanOrEqual(0.82);
+        expect(fs.snapshot().surgesSurvived).toBe(0);
     });
 });

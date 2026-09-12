@@ -10,6 +10,7 @@ import { COLORS } from '../ui/theme';
 import { RODS, REELS, LINES, BAITS, BOBBERS } from '../data/equipment';
 import type { EquipmentDef, EquipmentCategory } from '../data/types';
 import { formatCoins } from '../utils/format';
+import { fitImage } from '../ui/fitImage';
 
 const TABS: { key: EquipmentCategory; label: string; items: EquipmentDef[] }[] = [
     { key: 'rod', label: 'Rods', items: RODS },
@@ -23,10 +24,18 @@ export class ShopScene extends Phaser.Scene {
     private list!: ScrollList;
     private tabButtons: Phaser.GameObjects.Container[] = [];
     private activeTab: EquipmentCategory = 'rod';
+    private reducedMotion = false;
 
     constructor() { super(SCENE_KEYS.SHOP); }
 
     create(): void {
+        // Phaser reuses this same Scene instance on every relaunch, so without
+        // resetting this array each reopen would push 5 more button references
+        // onto stale, already-destroyed ones from the previous open -- rebuild()
+        // would then crash iterating a dead container (see AchievementScene's
+        // identical fix for the full explanation of the freeze this caused).
+        this.tabButtons = [];
+        this.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
         const services = getServices(this);
         const sheet = buildSheet(this, 'Tackle Shop', () => this.close());
         const left = GAME_WIDTH / 2 - sheet.width / 2;
@@ -35,7 +44,7 @@ export class ShopScene extends Phaser.Scene {
         TABS.forEach((tab, i) => {
             const btn = this.add.container(left + 130 + i * 200, top + 130);
             const bg = this.add.graphics();
-            const label = this.add.text(0, 0, tab.label, { fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#f4e8cf' }).setOrigin(0.5);
+            const label = this.add.text(0, 0, tab.label, { fontFamily: 'Fredoka, sans-serif', fontSize: '18px', color: '#f4e8cf', fontStyle: '700' }).setOrigin(0.5);
             btn.add([bg, label]);
             btn.setSize(180, 44).setInteractive({ useHandCursor: true });
             btn.on('pointerdown', () => { this.activeTab = tab.key; this.rebuild(services); });
@@ -66,7 +75,7 @@ export class ShopScene extends Phaser.Scene {
         });
 
         const tab = TABS.find(t => t.key === this.activeTab)!;
-        const rowH = 108;
+        const rowH = 124;
         const items: Phaser.GameObjects.GameObject[] = [];
         tab.items.forEach((def, i) => {
             items.push(this.buildRow(services, def, i * rowH, tab.items.length > 1 && def.price === 0));
@@ -79,41 +88,51 @@ export class ShopScene extends Phaser.Scene {
         const c = this.add.container(0, y);
         const bg = this.add.graphics();
         bg.fillStyle(0x0d232c, 0.5);
-        bg.fillRoundedRect(0, 6, w, 92, 14);
+        bg.fillRoundedRect(0, 6, w, 108, 14);
         c.add(bg);
 
         const owned = services.equipment.isOwned(def.id);
         const equipped = services.equipment.isEquipped(def.id);
         const levelOk = services.equipment.isUnlockedByLevel(def.id);
 
-        const rarityBar = this.add.rectangle(0, 52, 8, 80, levelOk ? 0x3ab7a7 : 0x5a6a70).setOrigin(0, 0.5);
-        c.add(rarityBar);
+        const artPlate = this.add.graphics();
+        artPlate.fillStyle(levelOk ? 0x163d47 : 0x24343a, 0.95);
+        artPlate.fillRoundedRect(14, 15, 108, 90, 12);
+        artPlate.lineStyle(2, levelOk ? COLORS.accent : COLORS.muted, 0.5);
+        artPlate.strokeRoundedRect(14, 15, 108, 90, 12);
+        const art = this.add.image(68, 60, `equipment-${def.category}`, def.id);
+        fitImage(art, 96, 76);
+        c.add([artPlate, art]);
 
-        const name = this.add.text(28, 22, def.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#f4e8cf' });
-        const desc = this.add.text(28, 54, def.description, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#b3a488' });
-        const statLine = this.add.text(28, 78, statSummary(def), { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#5ecdbd', fontStyle: '700' });
+        if (!this.reducedMotion && levelOk) {
+            this.tweens.add({ targets: art, y: 57, duration: 1000 + def.tier * 70, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+        }
+
+        const name = this.add.text(140, 20, def.name, { fontFamily: 'Fredoka, sans-serif', fontSize: '22px', color: '#f4e8cf', fontStyle: '700' });
+        const desc = this.add.text(140, 53, def.description, { fontFamily: 'Nunito, sans-serif', fontSize: '14px', color: '#d3c2a6', fontStyle: '700' });
+        const statLine = this.add.text(140, 80, statSummary(def), { fontFamily: 'Nunito, sans-serif', fontSize: '13px', color: '#5ecdbd', fontStyle: '700' });
         c.add([name, desc, statLine]);
 
         if (!levelOk) {
-            c.add(this.add.text(w - 260, 46, `Unlocks at Lv ${def.unlockLevel}`, { fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#e08a7a', fontStyle: '700' }).setOrigin(0, 0.5));
+            c.add(this.add.text(w - 260, 58, `Unlocks at Lv ${def.unlockLevel}`, { fontFamily: 'Nunito, sans-serif', fontSize: '15px', color: '#e08a7a', fontStyle: '700' }).setOrigin(0, 0.5));
         } else if (equipped) {
-            const btn = new Button(this, w - 110, 52, 'EQUIPPED', undefined, { width: 170, height: 48, color: 0x4a5a5e, fontSize: 16, disabled: true });
+            const btn = new Button(this, w - 110, 60, 'EQUIPPED', undefined, { width: 170, height: 48, color: 0x4a5a5e, fontSize: 16, disabled: true });
             c.add(btn);
         } else if (owned || isStarter) {
-            const btn = new Button(this, w - 110, 52, 'EQUIP', () => {
+            const btn = new Button(this, w - 110, 60, 'EQUIP', () => {
                 services.equipment.equip(def.id);
                 services.requestSave();
             }, { width: 170, height: 48, color: COLORS.accent, fontSize: 16 });
             c.add(btn);
         } else {
             const affordable = services.economy.canAfford(def.price);
-            const btn = new Button(this, w - 110, 52, `BUY  ${formatCoins(def.price)}`, () => {
+            const btn = new Button(this, w - 110, 60, formatCoins(def.price), () => {
                 if (services.equipment.buy(def.id, p => services.economy.spend(p))) {
                     services.audio.play('purchase');
                     services.achievements.checkAll();
                     services.requestSave();
                 }
-            }, { width: 190, height: 48, color: affordable ? COLORS.gold : COLORS.muted, fontSize: 15, disabled: !affordable });
+            }, { width: 190, height: 48, color: affordable ? COLORS.gold : COLORS.muted, fontSize: 17, disabled: !affordable, iconKey: 'coin-icon', iconSize: 20, iconGap: 8 });
             c.add(btn);
         }
 

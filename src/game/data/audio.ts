@@ -2,7 +2,7 @@
  * SFX manifest. `file` is optional -- if present and it loads, AudioSystem plays it.
  * If absent (or it fails to load), AudioSystem falls back to a small procedural
  * WebAudio synth recipe so the game always has real audio feedback with zero assets.
- * Drop matching files into public/assets/audio/ to replace any of these later.
+ * Drop matching files into public/visual-game-assets/audio/ to replace any of these later.
  */
 export type SynthRecipe =
     | { kind: 'blip'; freq: number; decay: number; type: OscillatorType }
@@ -24,6 +24,7 @@ export const SFX: SfxDef[] = [
     { key: 'nibble', synth: { kind: 'blip', freq: 520, decay: 0.06, type: 'sine' }, volume: 0.5 },
     { key: 'bite', synth: { kind: 'sweep', from: 180, to: 90, decay: 0.22, type: 'sawtooth' } },
     { key: 'reel-tick', synth: { kind: 'click', freq: 900 }, volume: 0.35 },
+    { key: 'reel-crank', synth: { kind: 'noise', decay: 0.05, filterFreq: 800 }, volume: 0.15 },
     { key: 'catch', synth: { kind: 'chord', freqs: [523, 659, 784, 1047], decay: 0.5, type: 'triangle', stagger: 0.05 } },
     { key: 'escape', synth: { kind: 'sweep', from: 400, to: 150, decay: 0.3, type: 'sawtooth' } },
     { key: 'coin', synth: { kind: 'blip', freq: 1200, decay: 0.1, type: 'square' }, volume: 0.4 },

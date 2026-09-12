@@ -42,3 +42,8 @@ export function getPerk(id: string): PerkDef {
 export function perkCost(perk: PerkDef, currentLevel: number): number {
     return Math.round(perk.baseCost * Math.pow(perk.costGrowth, currentLevel));
 }
+
+/** The shop always previews the next collectible tier, or tier 10 when mastered. */
+export function perkArtTier(perk: PerkDef, currentLevel: number): number {
+    return Math.max(1, Math.min(perk.maxLevel, currentLevel + 1));
+}

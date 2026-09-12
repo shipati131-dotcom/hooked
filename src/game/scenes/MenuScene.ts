@@ -20,7 +20,7 @@ export class MenuScene extends Phaser.Scene {
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.32, 'HOOKED', {
             fontFamily: 'Fredoka, sans-serif', fontSize: '128px', color: '#f4e8cf',
-            stroke: '#17252b', strokeThickness: 12
+            stroke: '#17252b', strokeThickness: 12, fontStyle: '700'
         }).setOrigin(0.5).setDepth(100);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.32 + 78, 'a cozy fishing game', {

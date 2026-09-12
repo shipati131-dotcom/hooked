@@ -2,3 +2,8 @@ node_modules
 dist
 *.log
 .DS_Store
+
+# Ephemeral QA/test-run artifacts (screenshots, action logs) -- not source
+output/
+progress.md
+*-test-actions.json
