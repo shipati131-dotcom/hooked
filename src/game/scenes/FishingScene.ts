@@ -20,7 +20,6 @@ import { COLORS } from '../ui/theme';
 // vertical) at one fixed position, close to the left edge. It never rotates,
 // bends, or slides; only the line and bobber travel to wherever the player
 // casts.
-const ROD_ANCHOR_Y = GAME_HEIGHT - 90;
 const ROD_FIXED_X = GAME_WIDTH * 0.25;
 // Bigger overall than a plain uniform scale-up would give.
 const ROD_DISPLAY_W = 480;
@@ -35,6 +34,10 @@ const ROD_ANGLE_DEG = -47;
 // them. The handle sits at local origin (0.046, 0.869) of the cell.
 const ROD_ATLAS_CELL = 512;
 const ROD_ATLAS_HANDLE_ORIGIN = { x: 0.046, y: 0.869 };
+// Anchor is the handle point, which sits above the sprite's true bottom edge
+// by (1 - originY) * displayH -- push the anchor down by that same amount so
+// the rod visually starts right at the bottom of the screen, not partway up.
+const ROD_ANCHOR_Y = GAME_HEIGHT - (1 - ROD_ATLAS_HANDLE_ORIGIN.y) * ROD_DISPLAY_H;
 const ROD_TIP_LOCAL = { length: 623, angleDeg: -44.4 };
 const ROD_TIP_SCALE_X = ROD_DISPLAY_W / ROD_ATLAS_CELL;
 const ROD_TIP_SCALE_Y = ROD_DISPLAY_H / ROD_ATLAS_CELL;
