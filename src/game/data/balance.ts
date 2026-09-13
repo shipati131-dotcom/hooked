@@ -6,8 +6,11 @@ import type { Rarity } from '../constants';
  */
 export const BALANCE = {
     xp: {
-        /** XP required to go from level L to L+1. Grows steadily slower, never flat/grindy. */
-        toNext: (level: number) => Math.round(40 + 45 * Math.pow(level, 1.6)),
+        // Gentler than the original curve, especially at low levels -- early
+        // levels used to take 6-9 catches each, which read as slow. This gets
+        // level 2 in ~5 common catches and keeps the whole climb noticeably
+        // faster while still growing (never flat/grindy).
+        toNext: (level: number) => Math.round(18 + 30 * Math.pow(level, 1.45)),
         maxLevel: 60,
         perfectBonusMult: 1.25
     },
