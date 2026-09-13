@@ -41,12 +41,14 @@ describe('FishingSystem end-to-end state machine', () => {
         driveToFighting(fs);
     });
 
-    it('lands a fish by holding the reel and returns to idle, emitting reelSuccess', () => {
+    it('lands a fish by following pull/release cues and returns to idle, emitting reelSuccess', () => {
         const fs = new FishingSystem();
         driveToFighting(fs);
         let succeeded: unknown = null;
         fs.on('reelSuccess', (...args: unknown[]) => { succeeded = args[0]; });
-        for (let i = 0; i < 60 * 90 && fs.state === 'fighting'; i++) fs.update(1000 / 30, true, 0);
+        for (let i = 0; i < 60 * 90 && fs.state === 'fighting'; i++) {
+            fs.update(1000 / 30, fs.fightSnapshot()?.requiredAction === 'pull', 0);
+        }
         expect(succeeded).not.toBeNull();
         expect(fs.state).toBe('idle');
     });

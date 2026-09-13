@@ -21,12 +21,11 @@ import { fishForLocation } from '../data/fish';
 import { COLORS } from '../ui/theme';
 import { MECHANIC_HINTS } from '../data/fishBehaviors';
 
-// The rod is completely static -- one fixed pose (angled to read as nearly
-// vertical) at one fixed position, close to the left edge. It never rotates,
-// bends, or slides on its own; it only bends toward the fish while fighting.
-const ROD_FIXED_X = GAME_WIDTH * 0.25;
-const ROD_DISPLAY_W = 480;
-const ROD_DISPLAY_H = 480;
+// A dedicated lower-left rod lane ends above the navigation. The fight HUD
+// begins at x=590, outside the rod's complete animated sweep.
+const ROD_FIXED_X = 370;
+const ROD_DISPLAY_W = 250;
+const ROD_DISPLAY_H = 250;
 const ROD_ANGLE_DEG = -47;
 // The on-screen rod uses the actual per-tier art from the 'equipment-rod'
 // atlas (frame = equipped rod id) instead of one fixed texture, so buying
@@ -37,7 +36,7 @@ const ROD_ANGLE_DEG = -47;
 // them. The handle sits at local origin (0.046, 0.869) of the cell.
 const ROD_ATLAS_CELL = 512;
 const ROD_ATLAS_HANDLE_ORIGIN = { x: 0.046, y: 0.869 };
-const ROD_ANCHOR_Y = GAME_HEIGHT - (1 - ROD_ATLAS_HANDLE_ORIGIN.y) * ROD_DISPLAY_H;
+const ROD_ANCHOR_Y = GAME_HEIGHT - 125;
 const ROD_TIP_LOCAL = { length: 623, angleDeg: -44.4 };
 const ROD_TIP_SCALE_X = ROD_DISPLAY_W / ROD_ATLAS_CELL;
 const ROD_TIP_SCALE_Y = ROD_DISPLAY_H / ROD_ATLAS_CELL;
@@ -47,8 +46,8 @@ const AIM_MAX_X = GAME_WIDTH - 100;
 const CAST_METER_X = ROD_FIXED_X + 210;
 const CAST_METER_Y = 330;
 const FIGHT_REF_X = GAME_WIDTH * 0.6;
-const FIGHT_HUD_X = GAME_WIDTH / 2;
-const FIGHT_HUD_Y = GAME_HEIGHT - 118;
+const FIGHT_HUD_X = 1040;
+const FIGHT_HUD_Y = GAME_HEIGHT - 160;
 // The bobber-art source image is 160x237; this scale renders it at a size
 // that's actually readable on the water instead of a near-invisible speck.
 const BOBBER_SCALE = 0.22;
@@ -84,6 +83,7 @@ export class FishingScene extends Phaser.Scene {
     private rodBendAngle = 0;
     private reelSoundTimer = 0;
     private animTime = 0;
+    private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     constructor() { super(SCENE_KEYS.FISHING); }
 
@@ -117,7 +117,7 @@ export class FishingScene extends Phaser.Scene {
         this.fightView = new FightView(this, FIGHT_REF_X, CAST_Y);
         this.catchCard = new CatchCard(this);
 
-        this.promptText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.78, 'Hold on the water to aim, release to cast', {
+        this.promptText = this.add.text(FIGHT_HUD_X, GAME_HEIGHT * 0.78, 'Hold on the water to aim, release to cast', {
             fontFamily: 'Nunito, sans-serif', fontSize: '24px', color: '#f4e8cf', fontStyle: '700',
             stroke: '#07161d', strokeThickness: 4
         }).setOrigin(0.5).setDepth(DEPTH.UI_TOP).setAlpha(0.85);
@@ -177,6 +177,17 @@ export class FishingScene extends Phaser.Scene {
         d?.on('down', () => this.onDirectionKey(1));
         [left, right, a, d].forEach(k => k?.on('up', () => { this.keyboardSteer = 0; }));
 
+        // Lost focus and overlay pauses must never leave the reel held down.
+        const clearInput = () => { this.isPointerDown = false; this.reelKeyDown = false; this.keyboardSteer = 0; };
+        this.events.on(Phaser.Scenes.Events.PAUSE, clearInput);
+        this.events.on(Phaser.Scenes.Events.RESUME, clearInput);
+        this.game.events.on(Phaser.Core.Events.BLUR, clearInput);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.game.events.off(Phaser.Core.Events.BLUR, clearInput);
+            this.events.off(Phaser.Scenes.Events.PAUSE, clearInput);
+            this.events.off(Phaser.Scenes.Events.RESUME, clearInput);
+        });
+
         // Development-only shortcut used by the visual QA loop: skips straight
         // to the fight against whatever fish rolls. Removed from production
         // builds and never changes normal player controls.
@@ -196,7 +207,7 @@ export class FishingScene extends Phaser.Scene {
     }
 
     private onPointerDown(x: number, y: number): void {
-        if (y > GAME_HEIGHT - 70) return; // ignore the bottom nav strip
+        if (y < 110 || y >= GAME_HEIGHT - 80 || this.resultCardOpen) return;
         this.isPointerDown = true;
         this.downX = x; this.downY = y;
         if (this.resultCardOpen) return;
@@ -368,9 +379,10 @@ export class FishingScene extends Phaser.Scene {
             this.promptText.setVisible(false);
             const key = `fish-${rolled.fish.id}`;
             generateFishTexture(this, key, rolled.fish.art);
-            this.fightHud.beginEncounter(rolled.fish.name, rolled.fish.rarity);
-            this.fightView.beginEncounter(key, rolled.fish.rarity);
-            this.showMechanicHintIfAny(services);
+            const showHelp = services.save.stats.totalCaught < 5;
+            this.fightHud.beginEncounter(rolled.fish.name, rolled.fish.rarity, showHelp);
+            this.fightView.beginEncounter(key, rolled.fish.rarity, showHelp);
+            if (showHelp) this.showMechanicHintIfAny(services);
         });
 
         this.fishing.on('fightMove', (...args: unknown[]) => {
@@ -611,10 +623,11 @@ export class FishingScene extends Phaser.Scene {
 
     /** The rod bends toward the fish while fighting: angle tracks tension and steer. */
     private updateRodBend(snap: FightSnapshot): void {
-        const tensionBend = snap.tension * 14;
-        const steerBend = this.getSteer() * 6;
-        const shake = snap.tensionZone === 'redline' ? Math.sin(this.animTime * 30) * 2.5 : 0;
-        const target = tensionBend + steerBend + shake;
+        const reduced = this.reducedMotion;
+        const tensionBend = snap.tension * 12;
+        const pump = snap.holding && !reduced ? Math.sin(this.animTime * 8) * 2 : 0;
+        const shake = snap.tensionZone === 'redline' && !reduced ? Math.sin(this.animTime * 24) * 1.5 : 0;
+        const target = tensionBend + pump + shake;
         this.rodBendAngle = Phaser.Math.Linear(this.rodBendAngle, target, 0.2);
     }
 
@@ -622,7 +635,7 @@ export class FishingScene extends Phaser.Scene {
         const activeAngle = ROD_ANGLE_DEG + this.rodBendAngle;
         this.rodSprite.setPosition(ROD_FIXED_X, ROD_ANCHOR_Y).setAngle(activeAngle);
 
-        const scalePulse = this.fishing.state === 'fighting' ? 1 + Math.sin(this.animTime * 5.0) * 0.006 : 1;
+        const scalePulse = this.fishing.state === 'fighting' && !this.reducedMotion ? 1 + Math.sin(this.animTime * 5.0) * 0.006 : 1;
         this.rodSprite.setDisplaySize(ROD_DISPLAY_W * scalePulse, ROD_DISPLAY_H * scalePulse);
 
         // ROD_TIP_LOCAL is the tip's offset from the handle at zero sprite
@@ -655,8 +668,15 @@ export class FishingScene extends Phaser.Scene {
         this.lineGfx.lineStyle(width, strokeColor, 0.85 + Math.min(1, tension) * 0.15);
         this.lineGfx.beginPath();
         this.lineGfx.moveTo(this.rodTipX, this.rodTipY);
-        this.lineGfx.lineTo((this.rodTipX + target.x) / 2 + wobble, (this.rodTipY + target.y) / 2);
-        this.lineGfx.lineTo(target.x, target.y);
+        const slack = snap && !snap.holding ? 60 : 6;
+        for (let i = 1; i <= 16; i++) {
+            const t = i / 16;
+            const arc = 4 * t * (1 - t);
+            this.lineGfx.lineTo(
+                Phaser.Math.Linear(this.rodTipX, target.x, t) + wobble * arc,
+                Phaser.Math.Linear(this.rodTipY, target.y, t) + slack * arc
+            );
+        }
         this.lineGfx.strokePath();
     }
 
@@ -672,8 +692,21 @@ export class FishingScene extends Phaser.Scene {
         this.rodSprite.setFrame(services.save.equipped.rod);
     }
 
+    visualState(): unknown {
+        if (!this.rodSprite?.active) return undefined;
+        return {
+            rod: this.rodSprite.getBounds(), rodTip: { x: this.rodTipX, y: this.rodTipY },
+            fightHud: { x: FIGHT_HUD_X - 450, y: FIGHT_HUD_Y - 66, width: 900, height: 132, visible: this.fightHud.visible },
+            fish: this.fightView.visualState(), resultOpen: this.resultCardOpen
+        };
+    }
+
     private shutdownScene(): void {
         this.fishing.removeAllListeners();
+        this.fishing.reset();
+        this.isPointerDown = false;
+        this.reelKeyDown = false;
+        this.resultCardOpen = false;
         this.fightView.destroy();
         this.env.destroy();
     }

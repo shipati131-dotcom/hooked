@@ -3,114 +3,132 @@ import { Rng } from '../src/game/utils/rng';
 import { FightModel, type FightGear } from '../src/game/systems/fishing/FightModel';
 import type { FightProfile } from '../src/game/data/types';
 
-function profile(overrides: Partial<FightProfile> = {}): FightProfile {
-    return {
-        behaviorType: 'small', stamina: 0.5, strength: 0.5, aggression: 0.3, burstChance: 0.2, burstPower: 1,
-        directionChangeFrequency: 5, recoveryRate: 0.05, hookDifficulty: 0.1, biteStyle: 'timid',
-        moves: ['cruise', 'run', 'rest'], parSec: 8, ...overrides
-    };
+const profile: FightProfile = {
+    behaviorType: 'small', stamina: 0.5, strength: 0.5, aggression: 0.3, burstChance: 0.2, burstPower: 1,
+    directionChangeFrequency: 5, recoveryRate: 0.05, hookDifficulty: 0.1, biteStyle: 'timid',
+    moves: ['cruise', 'run', 'rest'], parSec: 8
+};
+const gear: FightGear = {
+    rod: { control: 0, power: 1, rareLuck: 0, flex: 0.15 },
+    reel: { captureSpeed: 1, tensionResist: 1 },
+    line: { maxTension: 15, snapResist: 1, color: 0xffffff },
+    hook: { windowMult: 1, directionForgiveness: 0, holdStrength: 0 }
+};
+const make = (p = profile, g = gear, seed = 1) => new FightModel(p, g, 0.5, {}, new Rng(seed));
+function run(fm: FightModel, seconds: number, policy: boolean | 'correct', dt = 1 / 60) {
+    for (let i = 0; i < seconds / dt && !fm.isDone(); i++) {
+        fm.update(dt, policy === 'correct' ? fm.snapshot().requiredAction === 'pull' : policy);
+    }
+}
+function toRelease(fm: FightModel) {
+    while (fm.snapshot().requiredAction === 'pull') fm.update(1 / 60, true);
 }
 
-function gear(overrides: Partial<FightGear> = {}): FightGear {
-    return {
-        rod: { control: 0, power: 1, rareLuck: 0, flex: 0.15 },
-        reel: { captureSpeed: 1, tensionResist: 1 },
-        line: { maxTension: 15, snapResist: 1, color: 0xffffff },
-        hook: { windowMult: 1, directionForgiveness: 0, holdStrength: 0 },
-        ...overrides
-    };
-}
-
-function run(fm: FightModel, steps: number, holding: boolean, steer = 0, dtSec = 1 / 60): void {
-    for (let i = 0; i < steps && !fm.isDone(); i++) fm.update(dtSec, holding, steer);
-}
-
-describe('FightModel', () => {
-    it('a small, patient fish can be landed by steady reeling', () => {
-        const fm = new FightModel(profile({ stamina: 0.4, strength: 0.3 }), gear(), 0.5, {}, new Rng(1));
-        run(fm, 60 * 60, true); // up to 60s of holding
+describe('Pull / release battle', () => {
+    it('following the cues lands a fish after multiple windows with no escape risk', () => {
+        const fm = make();
+        run(fm, 45, 'correct');
         expect(fm.snapshot().result).toBe('landed');
+        expect(fm.snapshot().successfulReleases).toBeGreaterThanOrEqual(2);
+        expect(fm.snapshot().escapeRisk).toBe(0);
+        expect(fm.isPerfect()).toBe(true);
     });
-
-    it('never reeling lets the fish recover and eventually throw the hook via slack', () => {
-        const fm = new FightModel(profile(), gear(), 0.5, {}, new Rng(2));
-        run(fm, 60 * 30, false);
+    it('always holding fails even against the gentlest tutorial fish', () => {
+        const fm = make({ ...profile, strength: 0.1, aggression: 0.05, moves: ['cruise', 'rest'] });
+        run(fm, 60, true);
+        expect(fm.snapshot().result).toBe('lineSnapped');
+    });
+    it('never pulling loses the fish', () => {
+        const fm = make();
+        run(fm, 40, false);
         expect(fm.snapshot().result).toBe('slackEscape');
     });
-
-    it('reeling hard against a heavy fish on weak line risks a snap', () => {
-        let snaps = 0;
-        for (let seed = 1; seed <= 20; seed++) {
-            const fm = new FightModel(
-                profile({ behaviorType: 'heavy', stamina: 0.85, strength: 1.1, moves: ['cruise', 'dive', 'rest'] }),
-                gear({ rod: { control: 0, power: 1, rareLuck: 0, flex: 0.05 }, line: { maxTension: 15, snapResist: 0.8, color: 0 } }),
-                60, // a genuinely heavy fish relative to a 15-rated line
-                {}, new Rng(seed)
-            );
-            run(fm, 60 * 45, true); // reckless: always reeling
-            if (fm.snapshot().result === 'lineSnapped') snaps++;
+    it('wrong pulls give the fish ground and raise escape risk', () => {
+        const fm = make();
+        toRelease(fm);
+        const before = fm.snapshot();
+        run(fm, 0.7, true);
+        expect(fm.snapshot().distance).toBeGreaterThan(before.distance);
+        expect(fm.snapshot().escapeRisk).toBeGreaterThan(0);
+        expect(fm.snapshot().feedback).toBe('wrong-pull');
+    });
+    it('missing a pull window gives the fish ground and raises escape risk', () => {
+        const fm = make();
+        const before = fm.snapshot();
+        run(fm, 0.7, false);
+        expect(fm.snapshot().distance).toBeGreaterThan(before.distance);
+        expect(fm.snapshot().escapeRisk).toBeGreaterThan(0);
+        expect(fm.snapshot().feedback).toBe('missed-pull');
+    });
+    it('correctly releasing preserves distance and never punishes safe slack', () => {
+        const fm = make();
+        toRelease(fm);
+        const before = fm.snapshot().distance;
+        run(fm, 0.8, false);
+        expect(fm.snapshot().distance).toBe(before);
+        expect(fm.snapshot().escapeRisk).toBe(0);
+        expect(fm.snapshot().feedback).toBe('safe-release');
+    });
+    it('allows time to react at both cue changes, without input-spamming resetting grace', () => {
+        const fm = make();
+        run(fm, 0.18, false);
+        expect(fm.snapshot().escapeRisk).toBe(0);
+        toRelease(fm);
+        run(fm, 0.18, true);
+        expect(fm.snapshot().escapeRisk).toBe(0);
+        for (let i = 0; i < 60; i++) fm.update(1 / 60, i % 2 === 0);
+        expect(fm.snapshot().escapeRisk).toBeGreaterThan(0);
+    });
+    it('lets a player recover from a brief mistake and still land, but not perfectly', () => {
+        const fm = make();
+        run(fm, 0.8, false);
+        expect(fm.snapshot().escapeRisk).toBeGreaterThan(0);
+        run(fm, 60, 'correct');
+        expect(fm.snapshot().result).toBe('landed');
+        expect(fm.isPerfect()).toBe(false);
+    });
+    it('does not depend on pointer position or steering', () => {
+        const a = make(), b = make();
+        for (let i = 0; i < 250; i++) {
+            const pull = a.snapshot().requiredAction === 'pull';
+            a.update(1 / 60, pull, -1);
+            b.update(1 / 60, pull, 1);
         }
-        expect(snaps).toBeGreaterThan(0);
+        expect(a.snapshot()).toEqual(b.snapshot());
     });
-
-    it('always counter-steering (opposite the fish\'s current run) drains stamina faster on average than never steering', () => {
-        // "Counter" means steer opposite runDir; since the model tracks runDir per-frame,
-        // steer = -Math.sign(runDir) reliably counters whatever direction is active.
-        const avgStaminaAfterFixedTime = (counterSteer: boolean, seeds: number): number => {
-            let total = 0;
-            for (let seed = 1; seed <= seeds; seed++) {
-                const fm = new FightModel(profile({ moves: ['cruise', 'run'], aggression: 0.9, stamina: 0.9 }), gear(), 0.5, {}, new Rng(seed));
-                for (let i = 0; i < 60 * 5 && !fm.isDone(); i++) {
-                    const snap = fm.snapshot();
-                    const steer = counterSteer ? -Math.sign(snap.runDir || 1) : 0;
-                    fm.update(1 / 60, true, steer);
-                }
-                total += fm.snapshot().staminaFrac;
-            }
-            return total / seeds;
-        };
-        const neutralAvg = avgStaminaAfterFixedTime(false, 8);
-        const counteredAvg = avgStaminaAfterFixedTime(true, 8);
-        expect(counteredAvg).toBeLessThan(neutralAvg);
-    });
-
-    it('a flexible rod slows the tension rise compared to a stiff one under the same pull', () => {
-        const stiff = new FightModel(profile({ moves: ['cruise', 'run'], strength: 0.9 }), gear({ rod: { control: 0, power: 1, rareLuck: 0, flex: 0 } }), 0.5, {}, new Rng(9));
-        const flexy = new FightModel(profile({ moves: ['cruise', 'run'], strength: 0.9 }), gear({ rod: { control: 0, power: 1, rareLuck: 0, flex: 0.8 } }), 0.5, {}, new Rng(9));
-        run(stiff, 20, true);
-        run(flexy, 20, true);
-        expect(flexy.snapshot().tension).toBeLessThanOrEqual(stiff.snapshot().tension);
-    });
-
-    it('reel.tensionResist recovers tension faster once the player releases', () => {
-        const slow = new FightModel(profile({ moves: ['cruise', 'run'] }), gear({ reel: { captureSpeed: 1, tensionResist: 1 } }), 0.5, {}, new Rng(11));
-        const fast = new FightModel(profile({ moves: ['cruise', 'run'] }), gear({ reel: { captureSpeed: 1, tensionResist: 2 } }), 0.5, {}, new Rng(11));
-        run(slow, 30, true); run(fast, 30, true); // build up tension identically first
-        run(slow, 10, false); run(fast, 10, false); // then release for both
-        expect(fast.snapshot().tension).toBeLessThanOrEqual(slow.snapshot().tension);
-    });
-
-    it('legendary phases add moves and raise aggression as stamina drops', () => {
-        const fm = new FightModel(profile({
-            behaviorType: 'legendary', stamina: 1, strength: 0.6, aggression: 0.4,
-            moves: ['cruise', 'run', 'rest'],
-            phases: [{ staminaThreshold: 0.8, addMoves: ['thrash'], aggressionMult: 1.5, label: 'PHASE 2' }]
-        }), gear(), 2, {}, new Rng(13));
-        run(fm, 60 * 20, true);
-        expect(fm.snapshot().phaseIndex).toBeGreaterThanOrEqual(1);
-    });
-
-    it('a Solid hook-set starts the fish with reduced stamina versus a Light hook', () => {
-        const solid = new FightModel(profile(), gear(), 0.5, { startingStaminaFrac: 0.9 }, new Rng(1));
-        const light = new FightModel(profile(), gear(), 0.5, { startingStaminaFrac: 1 }, new Rng(1));
-        expect(solid.snapshot().staminaFrac).toBeLessThan(light.snapshot().staminaFrac);
-    });
-
-    it('isPerfect requires both landing within par and never redlining', () => {
-        const fm = new FightModel(profile({ stamina: 0.3, strength: 0.2, parSec: 30 }), gear(), 0.3, {}, new Rng(21));
-        run(fm, 60 * 30, true);
-        if (fm.snapshot().result === 'landed') {
-            expect(fm.isPerfect()).toBe(!fm.snapshot().everRedlined);
+    it('has consistent outcomes at 30, 60 and 120fps', () => {
+        const snapshots = [30, 60, 120].map(fps => {
+            const fm = make(); run(fm, 60, 'correct', 1 / fps); return fm.snapshot();
+        });
+        for (const snap of snapshots) {
+            expect(snap.result).toBe('landed');
+            expect(snap.escapeRisk).toBe(0);
+            expect(Math.abs(snap.elapsedSec - snapshots[0].elapsedSec)).toBeLessThan(0.25);
         }
+    });
+    it('ignores stalled time and cannot skip an entire cue on resume', () => {
+        const fm = make();
+        fm.update(30, false);
+        expect(fm.snapshot().elapsedSec).toBeCloseTo(0.25);
+        expect(fm.snapshot().result).toBe('none');
+        expect(fm.snapshot().requiredAction).toBe('pull');
+    });
+    it('better rod control extends reaction time, and stronger gear reduces mistake damage', () => {
+        const improved: FightGear = { ...gear, rod: { ...gear.rod, control: 0.5, flex: 0.8 },
+            reel: { ...gear.reel, tensionResist: 2 }, line: { ...gear.line, snapResist: 2 } };
+        const a = make(), b = make(profile, improved);
+        expect(b.snapshot().reactionGraceRemaining).toBeGreaterThan(a.snapshot().reactionGraceRemaining);
+        toRelease(a); toRelease(b);
+        run(a, 0.8, true); run(b, 0.8, true);
+        expect(b.snapshot().escapeRisk).toBeLessThan(a.snapshot().escapeRisk);
+        expect(b.snapshot().distance).toBeGreaterThan(0);
+    });
+    it('solid hook sets reduce starting stamina and later boss phases retain the same cues', () => {
+        const solid = new FightModel(profile, gear, 0.5, { startingStaminaFrac: 0.9 }, new Rng(1));
+        expect(solid.snapshot().staminaFrac).toBe(0.9);
+        const fm = make({ ...profile, phases: [{ staminaThreshold: 0.8, addMoves: ['jump'], aggressionMult: 1.2, label: 'SECOND WIND' }] });
+        run(fm, 60, 'correct');
+        expect(fm.snapshot().phaseIndex).toBe(1);
+        expect(fm.snapshot().result).toBe('landed');
     });
 });

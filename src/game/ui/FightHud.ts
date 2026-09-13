@@ -1,111 +1,89 @@
 import Phaser from 'phaser';
 import type { FightSnapshot } from '../systems/fishing/FightModel';
-import type { Rarity } from '../constants';
-import { RARITY_COLOR } from '../constants';
-import { COLORS, FONT_BODY, FONT_DISPLAY } from './theme';
+import { DEPTH, RARITY_COLOR, type Rarity } from '../constants';
+import { FONT_BODY, FONT_DISPLAY } from './theme';
 
 const W = 900;
-const H = 96;
+const H = 132;
 
-/**
- * A slim strip (not a full framed panel) shown above the bottom nav while a
- * fish is hooked: line tension (with a redline snap-grace ring), fish
- * stamina, and reel-in distance. The actual fight plays out in-world (see
- * art/FightView.ts) -- this is just the numbers.
- */
+/** The current action is primary; progress and the shared mistake budget are
+ * labeled separately. The rod has a reserved lane to the left of this strip. */
 export class FightHud extends Phaser.GameObjects.Container {
+    private bars: Phaser.GameObjects.Graphics;
     private frame: Phaser.GameObjects.Graphics;
-    private barsGfx: Phaser.GameObjects.Graphics;
+    private showHelp = true;
     private nameText: Phaser.GameObjects.Text;
+    private actionText: Phaser.GameObjects.Text;
     private hintText: Phaser.GameObjects.Text;
-    private distText: Phaser.GameObjects.Text;
-    private phasePips: Phaser.GameObjects.Text;
+    private nextText: Phaser.GameObjects.Text;
+    private progressText: Phaser.GameObjects.Text;
+    private riskText: Phaser.GameObjects.Text;
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
         super(scene, x, y);
-        this.frame = scene.add.graphics();
-        this.barsGfx = scene.add.graphics();
-        this.nameText = scene.add.text(-W / 2 + 18, -H / 2 + 14, '', {
-            fontFamily: FONT_DISPLAY, fontSize: '17px', color: '#f4e8cf', fontStyle: '700',
-            stroke: '#07161d', strokeThickness: 3
+        const frame = scene.add.graphics();
+        this.frame = frame;
+        frame.fillStyle(0x071a24, 0.98).fillRoundedRect(-W / 2, -H / 2, W, H, 12);
+        frame.lineStyle(2, 0x8db7ba, 0.7).strokeRoundedRect(-W / 2, -H / 2, W, H, 12);
+        this.bars = scene.add.graphics();
+        const text = (x: number, y: number, size: number, color = '#f4e8cf') => scene.add.text(x, y, '', {
+            fontFamily: FONT_BODY, fontSize: size + 'px', fontStyle: '800', color
         }).setOrigin(0, 0.5);
-        this.phasePips = scene.add.text(-W / 2 + 18, -H / 2 + 34, '', {
-            fontFamily: FONT_BODY, fontSize: '13px', color: '#ffd86a', fontStyle: '800'
-        }).setOrigin(0, 0.5);
-        this.hintText = scene.add.text(0, H / 2 - 12, '', {
-            fontFamily: FONT_BODY, fontSize: '14px', color: '#f4e8cf', fontStyle: '800',
-            stroke: '#07161d', strokeThickness: 3
-        }).setOrigin(0.5);
-        this.distText = scene.add.text(W / 2 - 18, -H / 2 + 14, '', {
-            fontFamily: FONT_BODY, fontSize: '14px', color: '#8fd6c9', fontStyle: '800'
-        }).setOrigin(1, 0.5);
-        this.add([this.frame, this.barsGfx, this.nameText, this.phasePips, this.distText, this.hintText]);
-        this.drawFrame();
-        this.setVisible(false);
+        this.nameText = text(-426, -43, 18);
+        this.actionText = text(-426, -4, 34).setFontFamily(FONT_DISPLAY);
+        this.hintText = text(-426, 38, 17);
+        this.nextText = text(-125, -5, 18);
+        this.progressText = text(90, -43, 17, '#90f0cd');
+        this.riskText = text(90, 14, 17, '#ffd7ab');
+        this.add([frame, this.bars, this.nameText, this.actionText, this.hintText, this.nextText, this.progressText, this.riskText]);
+        this.setDepth(DEPTH.MINIGAME).setVisible(false);
         scene.add.existing(this);
     }
 
-    private drawFrame(): void {
+    beginEncounter(fishName: string, rarity: Rarity, showHelp: boolean): void {
+        this.showHelp = showHelp;
+        this.actionText.setVisible(showHelp);
+        this.hintText.setVisible(showHelp);
+        this.nextText.setVisible(showHelp);
+        // Once learned, collapse the tutorial area into a compact status panel.
         this.frame.clear();
-        this.frame.fillStyle(0x071a24, 0.92);
-        this.frame.fillRoundedRect(-W / 2, -H / 2, W, H, 16);
-        this.frame.lineStyle(2, COLORS.sand, 0.55);
-        this.frame.strokeRoundedRect(-W / 2, -H / 2, W, H, 16);
-    }
-
-    beginEncounter(fishName: string, rarity: Rarity): void {
+        const left = showHelp ? -W / 2 : 66;
+        const width = W / 2 - left;
+        this.frame.fillStyle(0x071a24, 0.98).fillRoundedRect(left, -H / 2, width, H, 12);
+        this.frame.lineStyle(2, 0x8db7ba, 0.7).strokeRoundedRect(left, -H / 2, width, H, 12);
+        this.nameText.setX(showHelp ? -426 : 90);
+        this.progressText.setY(showHelp ? -43 : -14);
+        this.riskText.setY(showHelp ? 14 : 30);
+        this.scene.tweens.killTweensOf(this);
         this.nameText.setText(fishName).setColor('#' + RARITY_COLOR[rarity].toString(16).padStart(6, '0'));
-        this.setVisible(true).setAlpha(0).setScale(0.95);
-        this.scene.tweens.add({ targets: this, alpha: 1, scale: 1, duration: 200, ease: 'Cubic.easeOut' });
+        this.setVisible(true).setAlpha(1).setScale(1);
     }
 
     update(snap: FightSnapshot): void {
-        const barX = -W / 2 + 18, barW = W - 36;
-        this.barsGfx.clear();
-
-        // Tension bar: green (safe) / amber (power) / red (redline) zones, a
-        // needle, and a pulsing ring around the needle that fills as the
-        // snap-grace timer runs out.
-        const tensionY = -H / 2 + 52;
-        this.barsGfx.fillStyle(0x0d232c, 0.9);
-        this.barsGfx.fillRoundedRect(barX, tensionY, barW, 14, 7);
-        const zoneColor = snap.tensionZone === 'safe' ? COLORS.accent : snap.tensionZone === 'power' ? COLORS.gold : COLORS.danger;
-        this.barsGfx.fillStyle(zoneColor, 1);
-        this.barsGfx.fillRoundedRect(barX, tensionY, barW * Phaser.Math.Clamp(snap.tension, 0, 1), 14, 7);
-        if (snap.snapGraceFrac > 0) {
-            this.barsGfx.lineStyle(3, COLORS.danger, 0.5 + snap.snapGraceFrac * 0.5);
-            this.barsGfx.strokeRoundedRect(barX - 2, tensionY - 2, barW + 4, 18, 8);
+        const pulling = snap.requiredAction === 'pull';
+        const color = pulling ? 0x72e4bb : 0xffc67d;
+        this.actionText.setText(pulling ? 'PULL' : 'RELEASE').setColor(pulling ? '#90f0cd' : '#ffd099');
+        this.nextText.setText((pulling ? 'Release in ' : 'Pull in ') + snap.nextActionIn.toFixed(1) + 's');
+        const hint = snap.feedback === 'wrong-pull' ? 'Let go! The fish is taking line'
+            : snap.feedback === 'missed-pull' ? 'Hold now! The fish is getting away'
+            : pulling ? 'Hold mouse / touch / SPACE' : 'Let go and wait for PULL';
+        this.hintText.setText(hint).setColor(snap.feedback === 'wrong-pull' || snap.feedback === 'missed-pull' ? '#ffaca0' : '#f4e8cf');
+        const progress = Phaser.Math.Clamp(1 - snap.distance / 0.82, 0, 1);
+        this.progressText.setText('REELED IN  ' + Math.round(progress * 100) + '%');
+        this.riskText.setText('ESCAPE RISK  ' + Math.round(snap.escapeRisk * 100) + '%');
+        this.bars.clear();
+        if (this.showHelp) {
+            this.bars.fillStyle(0x28434b).fillRoundedRect(-125, 15, 175, 6, 3);
+            this.bars.fillStyle(color).fillRoundedRect(-125, 15, Math.max(2, 175 * snap.nextActionIn / snap.actionDuration), 6, 3);
         }
-
-        // Stamina bar.
-        const staminaY = -H / 2 + 72;
-        this.barsGfx.fillStyle(0x0d232c, 0.9);
-        this.barsGfx.fillRoundedRect(barX, staminaY, barW, 10, 5);
-        this.barsGfx.fillStyle(0xef4ccb, 1);
-        this.barsGfx.fillRoundedRect(barX, staminaY, barW * Phaser.Math.Clamp(snap.staminaFrac, 0, 1), 10, 5);
-
-        this.distText.setText(`${Math.round(snap.distance * 100)}m away`);
-        this.phasePips.setText(snap.phaseIndex > 0 ? '★'.repeat(snap.phaseIndex) : '');
-
-        if (snap.phaseAnnouncing) {
-            this.hintText.setText(snap.phaseLabel).setColor('#ffd86a');
-        } else if (snap.movePhase === 'telegraph') {
-            this.hintText.setText('Brace yourself...').setColor('#ffbf86');
-        } else if (snap.movePhase === 'active' && snap.moveLabel) {
-            this.hintText.setText(snap.moveLabel).setColor('#ff9a78');
-        } else if (snap.tensionZone === 'redline') {
-            this.hintText.setText('LINE ABOUT TO SNAP — LET GO!').setColor('#ff5a3d');
-        } else if (snap.slackFrac > 0.4) {
-            this.hintText.setText('IT\'S GETTING AWAY — REEL IN!').setColor('#ffbf86');
-        } else {
-            this.hintText.setText('Hold to reel, release to give line').setColor('#f4e8cf');
+        for (const [y, value, fill] of [[this.showHelp ? -25 : 0, progress, 0x72e4bb], [this.showHelp ? 32 : 44, snap.escapeRisk, 0xff806e]]) {
+            this.bars.fillStyle(0x28434b).fillRoundedRect(90, y, 332, 13, 5);
+            if (value > 0) this.bars.fillStyle(fill).fillRoundedRect(90, y, Math.max(2, 332 * value), 13, 5);
         }
     }
 
     endEncounter(): void {
-        this.scene.tweens.add({
-            targets: this, alpha: 0, scale: 0.96, duration: 160,
-            onComplete: () => this.setVisible(false)
-        });
+        this.scene.tweens.killTweensOf(this);
+        this.setVisible(false);
     }
 }

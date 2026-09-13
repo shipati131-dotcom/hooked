@@ -6,15 +6,14 @@ import { fitImage } from '../ui/fitImage';
 import { FONT_DISPLAY } from '../ui/theme';
 import type { FightSnapshot } from '../systems/fishing/FightModel';
 
-const NEAR_Y_OFFSET = 60; // below the reference Y at distance=0 (closest to the boat)
-const FAR_Y_OFFSET = -140; // above the reference Y at distance=1 (near the horizon)
-const NEAR_SCALE = 1.15;
-const FAR_SCALE = 0.4;
+const NEAR_Y_OFFSET = 140;
+const FAR_Y_OFFSET = -60;
+const NEAR_SCALE = 1.2;
+const FAR_SCALE = 0.68;
 
 /**
- * The in-world part of a fish fight: a dark "shadow" of the hooked fish
- * swimming on the actual water (lateral position + perspective distance),
- * a full-color splash when it jumps, a wake trail, and a move-label callout
+ * The colorful hooked fish swimming toward the player as distance decreases,
+ * a splash when it jumps, a wake trail, and a clear action callout
  * that floats above it. FightHud (a slim numeric strip) is the rest of the
  * fight's UI; this is the part that makes it feel like a real animal on
  * the other end of the line.
@@ -29,6 +28,8 @@ export class FightView {
     private fishScale = 1;
     private wasAirborne = false;
     private lastCalloutText = '';
+    private showHelp = true;
+    private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     constructor(scene: Phaser.Scene, refX: number, refY: number) {
         this.scene = scene;
@@ -45,10 +46,12 @@ export class FightView {
         }).setOrigin(0.5).setDepth(DEPTH.UI_TOP).setVisible(false);
     }
 
-    beginEncounter(fishTextureKey: string, rarity: Rarity): void {
+    beginEncounter(fishTextureKey: string, rarity: Rarity, showHelp: boolean): void {
+        this.showHelp = showHelp;
+        this.callout.setVisible(false);
         this.fish.setTexture(fishTextureKey).setVisible(true).clearTint();
-        this.fishScale = fitImage(this.fish, 150, 90);
-        this.fish.setTint(0x10181c).setTintMode(Phaser.TintModes.FILL);
+        this.fishScale = fitImage(this.fish, 200, 120);
+        this.fish.setAlpha(1).clearTint();
         this.wasAirborne = false;
         this.lastCalloutText = '';
         applyRarityGlow(this.fish, rarity);
@@ -66,16 +69,16 @@ export class FightView {
 
     update(snap: FightSnapshot): void {
         const x = this.xFor(snap.lateralPos);
-        const baseY = this.yFor(snap.distance);
+        const baseY = this.yFor(snap.distance) + (this.reducedMotion ? 0 : Math.sin(snap.elapsedSec * 7) * 3);
         const scaleMult = this.scaleFor(snap.distance);
 
         if (snap.airborne) {
-            const y = baseY - 70;
+            const y = baseY - (this.reducedMotion ? 0 : 45);
             this.fish.setPosition(x, y).setScale(this.fishScale * scaleMult * 1.1).clearTint();
             if (!this.wasAirborne) this.wake.explode(10, x, baseY);
         } else {
             this.fish.setPosition(x, baseY).setScale(this.fishScale * scaleMult)
-                .setTint(0x10181c).setTintMode(Phaser.TintModes.FILL);
+                .clearTint();
             if (snap.movePhase === 'active' && (snap.move === 'run' || snap.move === 'dive' || snap.move === 'thrash' || snap.move === 'frenzy')) {
                 this.wake.setPosition(x, baseY);
                 this.wake.frequency = 60;
@@ -83,19 +86,20 @@ export class FightView {
                 this.wake.frequency = -1;
             }
         }
-        if (snap.airborne && !this.wasAirborne) this.scene.cameras.main.shake(60, 0.002);
+        if (snap.airborne && !this.wasAirborne && !this.reducedMotion) this.scene.cameras.main.shake(60, 0.002);
         this.wasAirborne = snap.airborne;
 
-        const angle = snap.runDir * 12;
+        const angle = this.reducedMotion ? 0 : Math.sin(snap.elapsedSec * (snap.requiredAction === 'release' ? 12 : 5)) * 7;
         this.fish.setAngle(angle);
-        this.fish.setFlipX(snap.lateralPos < 0);
+        this.fish.setFlipX(snap.runDir < 0);
 
-        const label = snap.phaseAnnouncing ? snap.phaseLabel : (snap.movePhase === 'active' ? snap.moveLabel : '');
-        if (label) {
-            this.callout.setText(label).setPosition(x, baseY - 55).setVisible(true);
-            if (label !== this.lastCalloutText) {
+        const label = snap.requiredAction === 'pull' ? 'PULL' : 'RELEASE';
+        if (this.showHelp) {
+            this.callout.setText(label).setColor(snap.requiredAction === 'pull' ? '#90f0cd' : '#ffd099')
+                .setPosition(x, this.fish.y - this.fish.displayHeight / 2 - 24).setVisible(true);
+            if (label !== this.lastCalloutText && !this.reducedMotion) {
                 this.callout.setScale(0.7).setAlpha(0.9);
-                this.scene.tweens.add({ targets: this.callout, scale: 1, alpha: 1, duration: 150, ease: 'Back.easeOut' });
+                this.scene.tweens.add({ targets: this.callout, scale: 1, alpha: 1, duration: 150, ease: 'Cubic.easeOut' });
             }
         } else {
             this.callout.setVisible(false);
@@ -104,6 +108,10 @@ export class FightView {
     }
 
     /** World position of the fish, for the line to target. */
+    visualState(): unknown {
+        return { ...this.fish.getBounds(), visible: this.fish.visible, texture: this.fish.texture.key, tinted: this.fish.isTinted };
+    }
+
     lineTarget(): { x: number; y: number } {
         return { x: this.fish.x, y: this.fish.y };
     }

@@ -37,131 +37,48 @@ function buildFight(fishId: string, gear: FightGear, seed: number): FightModel {
     return new FightModel(profile, gear, weight, {}, new Rng(seed));
 }
 
-interface Policy { holding: (snap: FightSnapshot) => boolean; steer: (snap: FightSnapshot) => number; }
-
-const competent: Policy = {
-    holding: snap => snap.tension < 0.82,
-    steer: snap => -Math.sign(snap.runDir)
-};
-const reckless: Policy = { holding: () => true, steer: () => 0 };
-const passive: Policy = { holding: () => false, steer: () => 0 };
-const neutralHold: Policy = { holding: snap => snap.tension < 0.85, steer: () => 0 };
-const counterHold: Policy = { holding: snap => snap.tension < 0.85, steer: snap => -Math.sign(snap.runDir) };
-const followHold: Policy = { holding: snap => snap.tension < 0.85, steer: snap => Math.sign(snap.runDir) };
-
-function simulate(fm: FightModel, policy: Policy, maxSteps: number, dtSec = 1 / 30): FightSnapshot {
-    let snap = fm.snapshot();
-    for (let i = 0; i < maxSteps && snap.result === 'none'; i++) {
-        fm.update(dtSec, policy.holding(snap), policy.steer(snap));
-        snap = fm.snapshot();
+type Policy = 'reactive' | 'reckless' | 'passive';
+function simulate(fm: FightModel, policy: Policy): FightSnapshot {
+    let held = true, previous = fm.snapshot().requiredAction, reaction = 0;
+    for (let i = 0; i < 60 * 90 && !fm.isDone(); i++) {
+        const snap = fm.snapshot();
+        if (snap.requiredAction !== previous) { reaction = 0.18; previous = snap.requiredAction; }
+        reaction -= 1 / 60;
+        if (reaction <= 0) held = snap.requiredAction === 'pull';
+        fm.update(1 / 60, policy === 'reactive' ? held : policy === 'reckless', 0);
     }
-    return snap;
+    return fm.snapshot();
 }
 
-describe('Fight balance simulation', () => {
-    it('a competent bot lands every rarity tier within its target duration band', () => {
+describe('Fight balance across all rarities', () => {
+    it('human-speed reactions land every rarity with appropriate gear', () => {
         for (const tier of TIERS) {
-            const gear = gearFor(tier.rodTier, tier.reelTier, tier.lineTier, tier.hookTier);
-            let landed = 0;
-            let totalSec = 0;
-            const N = 6;
-            for (let seed = 1; seed <= N; seed++) {
-                const fm = buildFight(tier.fishId, gear, seed);
-                const snap = simulate(fm, competent, 60 * 90);
-                if (snap.result === 'landed') { landed++; totalSec += snap.elapsedSec; }
-            }
-            expect(landed, `${tier.rarity} should be landable by a competent bot`).toBeGreaterThan(N * 0.6);
-            const avgSec = totalSec / Math.max(1, landed);
-            // Loose sanity bounds, not the tight design-doc band: era-appropriate top
-            // gear legitimately speeds up even a mythic fight (that's the payoff for
-            // grinding to it), so this only catches "instant win" / "never lands" bugs.
-            expect(avgSec, `${tier.rarity} average landing time`).toBeGreaterThanOrEqual(tier.band[0] * 0.25);
-            expect(avgSec, `${tier.rarity} average landing time`).toBeLessThanOrEqual(tier.band[1] * 1.6);
-        }
-    });
-
-    it('a reckless bot (always reeling) snaps a heavy fish on starter line a meaningful fraction of the time', () => {
-        const gear = gearFor(1, 1, 1, 1); // starter gear against the rare/heavy catfish
-        let snaps = 0;
-        const N = 40;
-        for (let seed = 1; seed <= N; seed++) {
-            const fm = buildFight('catfish', gear, seed);
-            const snap = simulate(fm, reckless, 60 * 60);
-            if (snap.result === 'lineSnapped') snaps++;
-        }
-        expect(snaps / N).toBeGreaterThanOrEqual(0.4);
-    });
-
-    it('a passive bot (never reeling) always loses the fish to slack', () => {
-        const gear = gearFor(1, 1, 1, 1);
-        for (let seed = 1; seed <= 5; seed++) {
-            const fm = buildFight('bluegill', gear, seed);
-            const snap = simulate(fm, passive, 60 * 30);
-            expect(snap.result).toBe('slackEscape');
-        }
-    });
-
-    it('a counter-steering bot lands the fish faster on average than a neutral bot', () => {
-        const gear = gearFor(3, 2, 2, 2);
-        const avg = (policy: Policy): number => {
-            let total = 0, landed = 0;
             for (let seed = 1; seed <= 10; seed++) {
-                const fm = buildFight('muskie', gear, seed);
-                const snap = simulate(fm, policy, 60 * 90);
-                if (snap.result === 'landed') { total += snap.elapsedSec; landed++; }
+                const snap = simulate(buildFight(tier.fishId, gearFor(tier.rodTier, tier.reelTier, tier.lineTier, tier.hookTier), seed), 'reactive');
+                expect(snap.result, tier.rarity + ' seed ' + seed).toBe('landed');
+                expect(snap.escapeRisk).toBe(0);
+                expect(snap.elapsedSec).toBeGreaterThan(5);
+                expect(snap.elapsedSec).toBeLessThan(60);
+                expect(snap.successfulReleases).toBeGreaterThanOrEqual(2);
             }
-            return landed ? total / landed : Infinity;
-        };
-        expect(avg(counterHold)).toBeLessThan(avg(neutralHold));
+        }
     });
-
-    it('a follow-steering bot keeps less average tension than a neutral bot', () => {
-        const gear = gearFor(3, 2, 2, 2);
-        const avgTension = (policy: Policy): number => {
-            let sum = 0, samples = 0;
-            for (let seed = 1; seed <= 10; seed++) {
-                const fm = buildFight('muskie', gear, seed);
-                let snap = fm.snapshot();
-                for (let i = 0; i < 60 * 20 && snap.result === 'none'; i++) {
-                    fm.update(1 / 30, policy.holding(snap), policy.steer(snap));
-                    snap = fm.snapshot();
-                    sum += snap.tension; samples++;
+    it('holding forever or releasing forever loses at every rarity, even with top gear', () => {
+        for (const tier of TIERS) {
+            for (const policy of ['reckless', 'passive'] as const) {
+                for (let seed = 1; seed <= 6; seed++) {
+                    const snap = simulate(buildFight(tier.fishId, gearFor(6, 5, 5, 5), seed), policy);
+                    expect(snap.result, tier.rarity + ' ' + policy).toBe(policy === 'reckless' ? 'lineSnapped' : 'slackEscape');
                 }
             }
-            return sum / samples;
-        };
-        expect(avgTension(followHold)).toBeLessThan(avgTension(neutralHold));
+        }
     });
-
-    it('a flexible rod measurably cuts the snap rate versus a stiff rod under reckless play', () => {
-        const snapRate = (flex: number): number => {
-            let snaps = 0;
-            const N = 40;
-            for (let seed = 1; seed <= N; seed++) {
-                const gear = gearFor(1, 1, 1, 1);
-                gear.rod = { ...gear.rod, flex };
-                const fm = buildFight('catfish', gear, seed);
-                const snap = simulate(fm, reckless, 60 * 60);
-                if (snap.result === 'lineSnapped') snaps++;
-            }
-            return snaps / N;
-        };
-        expect(snapRate(0.85)).toBeLessThan(snapRate(0.05));
-    });
-
-    it('reel drag assist (tensionResist) measurably cuts the snap rate versus a basic reel under reckless play', () => {
-        const snapRate = (tensionResist: number): number => {
-            let snaps = 0;
-            const N = 40;
-            for (let seed = 1; seed <= N; seed++) {
-                const gear = gearFor(1, 1, 1, 1);
-                gear.reel = { ...gear.reel, tensionResist };
-                const fm = buildFight('catfish', gear, seed);
-                const snap = simulate(fm, reckless, 60 * 60);
-                if (snap.result === 'lineSnapped') snaps++;
-            }
-            return snaps / N;
-        };
-        expect(snapRate(2.6)).toBeLessThan(snapRate(1.0));
+    it('upgraded rod and reel shorten fights but do not bypass release windows', () => {
+        const basic = simulate(buildFight('catfish', gearFor(1, 1, 1, 1), 5), 'reactive');
+        const improved = simulate(buildFight('catfish', gearFor(5, 4, 4, 4), 5), 'reactive');
+        expect(basic.result).toBe('landed');
+        expect(improved.result).toBe('landed');
+        expect(improved.elapsedSec).toBeLessThan(basic.elapsedSec);
+        expect(improved.successfulReleases).toBeGreaterThanOrEqual(2);
     });
 });

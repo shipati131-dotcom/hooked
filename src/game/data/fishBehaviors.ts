@@ -86,9 +86,9 @@ export const MECHANIC_UNLOCKS = {
 
 /** Coach-hint copy shown for the first 2 catches after a mechanic unlocks. */
 export const MECHANIC_HINTS: Record<keyof typeof MECHANIC_UNLOCKS, string> = {
-    steering: 'The fish is running — drag to steer the rod, opposite its pull to fight harder',
-    diveAndRest: 'Heavy fish dive and take line — hold a steady reel. When it tires, reel fast!',
+    steering: 'Hold during PULL. Let go during RELEASE to keep the fish hooked.',
+    diveAndRest: 'Release while the fish dives. Pull when it tires!',
     jumps: 'Fish jump! Give slack while it\'s airborne or it may throw the hook',
     thrashAndFakeBites: 'Watch for a false bite — wait for the real plunge before you strike',
-    fakeouts: 'Tricky fish fake one direction, then run the other — read the real pull'
+    fakeouts: 'Tricky fish change direction — keep following PULL and RELEASE.'
 };
