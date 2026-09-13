@@ -10,6 +10,7 @@ export interface LoadoutLuck {
     rodRareLuck: number;
     baitRarityLuck: number;
     luckyHookBonus: number; // from perk, e.g. 0.02 per level
+    castBonus?: number; // from CastModel.release() -- perfect casts and hotspots add to this
 }
 
 export interface RolledFish {
@@ -29,7 +30,7 @@ export class FishGenerator {
 
     rollRarity(locationId: string, luck: LoadoutLuck, castsSinceRareOrBetter: number): Rarity {
         const loc = getLocation(locationId);
-        const totalLuck = luck.rodRareLuck + luck.baitRarityLuck + luck.luckyHookBonus;
+        const totalLuck = luck.rodRareLuck + luck.baitRarityLuck + luck.luckyHookBonus + (luck.castBonus ?? 0);
         const pity = Math.min(
             BALANCE.rarity.pityMaxBonus,
             Math.max(0, castsSinceRareOrBetter - BALANCE.rarity.pityStartCasts) * BALANCE.rarity.pityRampPerCast
@@ -60,17 +61,17 @@ export class FishGenerator {
         return this.r.weighted(entries);
     }
 
-    rollWeight(fish: FishDef, fishSenseLevel: number): { weight: number; percentile: number; sizeLabel: SizeLabel } {
-        const skew = Math.max(1.1, BALANCE.rarity.weightSkew - fishSenseLevel * BALANCE.rarity.weightSkewFishSenseReduction);
+    rollWeight(fish: FishDef, fishSenseLevel: number, extraSkewReduction = 0): { weight: number; percentile: number; sizeLabel: SizeLabel } {
+        const skew = Math.max(1.1, BALANCE.rarity.weightSkew - fishSenseLevel * BALANCE.rarity.weightSkewFishSenseReduction - extraSkewReduction);
         const p = Math.pow(this.r.next(), skew);
         const weight = fish.minWeight + (fish.maxWeight - fish.minWeight) * p;
         return { weight, percentile: p, sizeLabel: sizeLabelForPercentile(p) };
     }
 
-    roll(locationId: string, luck: LoadoutLuck, discovered: Set<string>, castsSinceRareOrBetter: number, fishSenseLevel: number): RolledFish {
+    roll(locationId: string, luck: LoadoutLuck, discovered: Set<string>, castsSinceRareOrBetter: number, fishSenseLevel: number, castWeightSkewReduction = 0): RolledFish {
         const rarity = this.rollRarity(locationId, luck, castsSinceRareOrBetter);
         const fish = this.rollSpecies(locationId, rarity, discovered);
-        const { weight, percentile, sizeLabel } = this.rollWeight(fish, fishSenseLevel);
+        const { weight, percentile, sizeLabel } = this.rollWeight(fish, fishSenseLevel, castWeightSkewReduction);
         return { fish, weight, weightPercentile: percentile, sizeLabel };
     }
 }

@@ -7,7 +7,7 @@ import { buildSheet } from '../ui/Sheet';
 import { ScrollList } from '../ui/ScrollList';
 import { Button } from '../ui/Button';
 import { COLORS } from '../ui/theme';
-import { RODS, REELS, LINES, BAITS, BOBBERS } from '../data/equipment';
+import { RODS, REELS, LINES, BAITS, BOBBERS, HOOKS } from '../data/equipment';
 import type { EquipmentDef, EquipmentCategory } from '../data/types';
 import { formatCoins } from '../utils/format';
 import { fitImage } from '../ui/fitImage';
@@ -17,6 +17,7 @@ const TABS: { key: EquipmentCategory; label: string; items: EquipmentDef[] }[] =
     { key: 'reel', label: 'Reels', items: REELS },
     { key: 'line', label: 'Lines', items: LINES },
     { key: 'bait', label: 'Bait', items: BAITS },
+    { key: 'hook', label: 'Hooks', items: HOOKS },
     { key: 'bobber', label: 'Bobbers', items: BOBBERS }
 ];
 
@@ -100,7 +101,12 @@ export class ShopScene extends Phaser.Scene {
         artPlate.fillRoundedRect(14, 15, 108, 90, 12);
         artPlate.lineStyle(2, levelOk ? COLORS.accent : COLORS.muted, 0.5);
         artPlate.strokeRoundedRect(14, 15, 108, 90, 12);
-        const art = this.add.image(68, 60, `equipment-${def.category}`, def.id);
+        // Hooks have no shared atlas (unlike rods/reels/etc) -- each tier is its
+        // own individually-loaded SVG icon keyed 'equipment-hook-<id>' directly,
+        // rather than a frame within one 'equipment-hook' texture.
+        const art = def.category === 'hook'
+            ? this.add.image(68, 60, `equipment-hook-${def.id}`)
+            : this.add.image(68, 60, `equipment-${def.category}`, def.id);
         fitImage(art, 96, 76);
         c.add([artPlate, art]);
 
@@ -148,10 +154,11 @@ export class ShopScene extends Phaser.Scene {
 function statSummary(def: EquipmentDef): string {
     const s = def.stats as unknown as Record<string, number>;
     switch (def.category) {
-        case 'rod': return `Control ${s.control}  •  Power ${s.power.toFixed(1)}x  •  Rare luck +${(s.rareLuck * 100).toFixed(0)}%`;
-        case 'reel': return `Capture speed ${s.captureSpeed.toFixed(2)}x  •  Tension resist ${s.tensionResist.toFixed(2)}x`;
+        case 'rod': return `Control ${s.control}  •  Power ${s.power.toFixed(1)}x  •  Flex ${(s.flex * 100).toFixed(0)}%  •  Rare luck +${(s.rareLuck * 100).toFixed(0)}%`;
+        case 'reel': return `Reel speed ${s.captureSpeed.toFixed(2)}x  •  Drag assist +${((s.tensionResist - 1) * 100).toFixed(0)}%`;
         case 'line': return `Max tension ${s.maxTension}  •  Snap resist ${s.snapResist.toFixed(2)}x`;
         case 'bait': return `Bite speed ${s.biteSpeed.toFixed(2)}x  •  Rarity luck +${(s.rarityLuck * 100).toFixed(0)}%`;
+        case 'hook': return `Strike window +${((s.windowMult - 1) * 100).toFixed(0)}%  •  Wrong-swipe forgiveness ${(s.directionForgiveness * 100).toFixed(0)}%  •  Hold ${(s.holdStrength * 100).toFixed(0)}%`;
         case 'bobber': return 'Cosmetic';
         default: return '';
     }

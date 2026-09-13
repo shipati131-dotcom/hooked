@@ -6,7 +6,7 @@ import { SPECIES_WITH_REAL_ART } from '../art/FishArt';
 import { LOCATIONS_WITH_VIDEO } from '../art/LocationRenderer';
 import { LOCATIONS } from '../data/locations';
 import { PERKS } from '../data/upgrades';
-import { RODS, REELS, LINES, BAITS, BOBBERS } from '../data/equipment';
+import { RODS, REELS, LINES, BAITS, BOBBERS, HOOKS } from '../data/equipment';
 import type { EquipmentDef, EquipmentCategory } from '../data/types';
 
 const EQUIPMENT_ATLASES: { category: EquipmentCategory; file: string; cols: number; rows: number; items: EquipmentDef[] }[] = [
@@ -48,6 +48,13 @@ export class BootScene extends Phaser.Scene {
         this.load.svg('coin-icon-art', 'visual-game-assets/icons/coin.svg', { width: 128, height: 128 });
         for (const location of LOCATIONS) {
             this.load.svg(`location-icon-${location.id}`, `visual-game-assets/icons/${location.id}.svg`, { width: 64, height: 64 });
+        }
+        // Hooks have no illustrated atlas (unlike rods/reels/etc) -- each tier is
+        // its own colored SVG icon, loaded under 'equipment-hook-<id>' so
+        // ShopScene's `this.add.image(x, y, 'equipment-${category}', def.id)`
+        // pattern still works uniformly across every equipment category.
+        for (const hook of HOOKS) {
+            this.load.svg(`equipment-hook-${hook.id}`, `visual-game-assets/icons/hooks/${hook.id}.svg`, { width: 128, height: 128 });
         }
     }
 

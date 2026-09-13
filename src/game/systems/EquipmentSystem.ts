@@ -2,7 +2,7 @@ import type { SaveData } from '../core/GameState';
 import { GameBus } from '../core/GameState';
 import { EVENTS } from '../core/events';
 import { ALL_EQUIPMENT, getEquipment } from '../data/equipment';
-import type { EquipmentCategory, RodStats, ReelStats, LineStats, BaitStats, BobberStats } from '../data/types';
+import type { EquipmentCategory, RodStats, ReelStats, LineStats, BaitStats, BobberStats, HookStats } from '../data/types';
 
 export interface LoadoutStats {
     rod: RodStats;
@@ -10,6 +10,7 @@ export interface LoadoutStats {
     line: LineStats;
     bait: BaitStats;
     bobber: BobberStats;
+    hook: HookStats;
 }
 
 export class EquipmentSystem {
@@ -50,7 +51,7 @@ export class EquipmentSystem {
     }
 
     private recalcCategoriesUpgraded(): void {
-        const categories: EquipmentCategory[] = ['rod', 'reel', 'line', 'bait', 'bobber'];
+        const categories: EquipmentCategory[] = ['rod', 'reel', 'line', 'bait', 'bobber', 'hook'];
         let count = 0;
         for (const cat of categories) {
             const owned = ALL_EQUIPMENT.filter(e => e.category === cat && this.isOwned(e.id));
@@ -65,7 +66,8 @@ export class EquipmentSystem {
             reel: getEquipment(this.save.equipped.reel).stats as ReelStats,
             line: getEquipment(this.save.equipped.line).stats as LineStats,
             bait: getEquipment(this.save.equipped.bait).stats as BaitStats,
-            bobber: getEquipment(this.save.equipped.bobber).stats as BobberStats
+            bobber: getEquipment(this.save.equipped.bobber).stats as BobberStats,
+            hook: getEquipment(this.save.equipped.hook).stats as HookStats
         };
     }
 }

@@ -20,6 +20,7 @@ export interface SaveData {
         line: string;
         bait: string;
         bobber: string;
+        hook: string;
     };
     ownedEquipment: string[]; // equipment ids owned (rods/reels/lines/baits/bobbers beyond the defaults)
     perkLevels: Record<string, number>;

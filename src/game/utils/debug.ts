@@ -30,7 +30,7 @@ export function installDebugHooks(game: Phaser.Game): void {
         const services = getServices();
         if (!services) return JSON.stringify({ mode: 'loading' });
         const fishingScene = game.scene.getScene('FishingScene') as unknown as {
-            fishing?: { state?: string; snapshot?: () => unknown };
+            fishing?: { state?: string; fightSnapshot?: () => unknown };
         };
         const fishing = fishingScene?.fishing;
         const textureKeys = game.textures.getTextureKeys();
@@ -45,7 +45,7 @@ export function installDebugHooks(game: Phaser.Game): void {
             coins: services.save.coins,
             totalCaught: services.save.stats.totalCaught,
             fishingState: fishing?.state ?? 'inactive',
-            reel: fishing?.state === 'reeling' ? fishing.snapshot?.() : undefined,
+            reel: fishing?.state === 'fighting' ? fishing.fightSnapshot?.() : undefined,
             assetAudit: {
                 fishTextures: textureKeys.filter(key => key.startsWith('fish-')).length,
                 locationTextures: textureKeys.filter(key => key.startsWith('location-') && !key.endsWith('-video')).length,

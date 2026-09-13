@@ -35,7 +35,23 @@ export const SFX: SfxDef[] = [
     { key: 'achievement', synth: { kind: 'chord', freqs: [659, 784, 988], decay: 0.5, type: 'sine', stagger: 0.06 } },
     { key: 'rare', synth: { kind: 'sweep', from: 300, to: 1400, decay: 0.6, type: 'sine' } },
     { key: 'click', synth: { kind: 'click', freq: 700 }, volume: 0.3 },
-    { key: 'hook-window', synth: { kind: 'blip', freq: 880, decay: 0.08, type: 'square' }, volume: 0.4 }
+    { key: 'hook-window', synth: { kind: 'blip', freq: 880, decay: 0.08, type: 'square' }, volume: 0.4 },
+
+    // -- new redesign cues --
+    { key: 'cast-charge', synth: { kind: 'click', freq: 500 }, volume: 0.18 },
+    { key: 'cast-perfect', synth: { kind: 'chord', freqs: [784, 1175], decay: 0.22, type: 'triangle', stagger: 0.03 }, volume: 0.35 },
+    { key: 'hotspot', synth: { kind: 'chord', freqs: [880, 1318], decay: 0.3, type: 'sine', stagger: 0.04 }, volume: 0.3 },
+    { key: 'tug', synth: { kind: 'blip', freq: 340, decay: 0.08, type: 'sine' }, volume: 0.4 },
+    { key: 'drag', synth: { kind: 'noise', decay: 0.4, filterFreq: 500 }, volume: 0.2 },
+    { key: 'strike', synth: { kind: 'sweep', from: 260, to: 520, decay: 0.12, type: 'square' }, volume: 0.4 },
+    { key: 'hook-set', synth: { kind: 'chord', freqs: [440, 660], decay: 0.18, type: 'square' }, volume: 0.35 },
+    { key: 'line-strain', synth: { kind: 'noise', decay: 0.15, filterFreq: 2200 }, volume: 0.18 },
+    { key: 'line-snap', synth: { kind: 'sweep', from: 900, to: 80, decay: 0.35, type: 'sawtooth' }, volume: 0.5 },
+    { key: 'fish-run', synth: { kind: 'sweep', from: 200, to: 340, decay: 0.2, type: 'sine' }, volume: 0.28 },
+    { key: 'fish-jump', synth: { kind: 'sweep', from: 300, to: 900, decay: 0.3, type: 'sine' }, volume: 0.35 },
+    { key: 'splash-big', synth: { kind: 'noise', decay: 0.5, filterFreq: 900 }, volume: 0.4 },
+    { key: 'tired', synth: { kind: 'blip', freq: 260, decay: 0.2, type: 'sine' }, volume: 0.3 },
+    { key: 'phase', synth: { kind: 'chord', freqs: [220, 440, 880], decay: 0.6, type: 'sawtooth', stagger: 0.08 }, volume: 0.4 }
 ];
 
 export function getSfx(key: string): SfxDef {

@@ -12,7 +12,7 @@ export const PERKS: PerkDef[] = [
         format: (lvl, next) => `-${(lvl * 3.5).toFixed(0)}% wait time${lvl < 10 ? ` (next: -${(next * 3.5).toFixed(0)}%)` : ' (MAX)'}`
     },
     {
-        id: 'strong-arms', name: 'Strong Arms', description: 'Fills the capture meter faster while reeling.',
+        id: 'strong-arms', name: 'Strong Arms', description: 'Reel in faster and wear fish down quicker.',
         maxLevel: 10, baseCost: 220, costGrowth: 1.55, effectPerLevel: 0.03,
         format: (lvl, next) => `+${(lvl * 3)}% capture speed${lvl < 10 ? ` (next: +${(next * 3)}%)` : ' (MAX)'}`
     },

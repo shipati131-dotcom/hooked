@@ -1,12 +1,12 @@
-import type { EquipmentDef, RodStats, ReelStats, LineStats, BaitStats, BobberStats } from './types';
+import type { EquipmentDef, RodStats, ReelStats, LineStats, BaitStats, BobberStats, HookStats } from './types';
 
 export const RODS: EquipmentDef[] = [
-    { id: 'rod-old', category: 'rod', name: 'Old Rod', description: 'A hand-me-down rod. It works, mostly.', price: 0, unlockLevel: 1, tier: 1, stats: { control: 0, power: 1.0, rareLuck: 0 } as RodStats },
-    { id: 'rod-fiberglass', category: 'rod', name: 'Fiberglass Rod', description: 'Lighter and a lot more forgiving in the reel.', price: 250, unlockLevel: 2, tier: 2, stats: { control: 3, power: 1.25, rareLuck: 0.05 } as RodStats },
-    { id: 'rod-carbon', category: 'rod', name: 'Carbon Rod', description: 'Stiff, sensitive, built for bigger fights.', price: 2200, unlockLevel: 6, tier: 3, stats: { control: 7, power: 1.6, rareLuck: 0.12 } as RodStats },
-    { id: 'rod-pro', category: 'rod', name: 'Pro Angler Rod', description: 'Tournament-grade gear with real bite feedback.', price: 12000, unlockLevel: 12, tier: 4, stats: { control: 12, power: 2.1, rareLuck: 0.22 } as RodStats },
-    { id: 'rod-deepsea', category: 'rod', name: 'Deep Sea Rod', description: 'Built to handle open-ocean monsters.', price: 60000, unlockLevel: 20, tier: 5, stats: { control: 17, power: 2.8, rareLuck: 0.35 } as RodStats },
-    { id: 'rod-legendary', category: 'rod', name: 'Legendary Rod', description: 'Said to have never lost a fish.', price: 400000, unlockLevel: 35, tier: 6, stats: { control: 24, power: 3.6, rareLuck: 0.55 } as RodStats }
+    { id: 'rod-old', category: 'rod', name: 'Old Rod', description: 'A hand-me-down rod. It works, mostly.', price: 0, unlockLevel: 1, tier: 1, stats: { control: 0, power: 1.0, rareLuck: 0, flex: 0.15 } as RodStats },
+    { id: 'rod-fiberglass', category: 'rod', name: 'Fiberglass Rod', description: 'Flexes to soak up sudden runs -- very forgiving in a fight.', price: 250, unlockLevel: 2, tier: 2, stats: { control: 3, power: 1.25, rareLuck: 0.05, flex: 0.55 } as RodStats },
+    { id: 'rod-carbon', category: 'rod', name: 'Carbon Rod', description: 'Stiff and sensitive -- hits harder, but bursts land at full force.', price: 2200, unlockLevel: 6, tier: 3, stats: { control: 7, power: 1.6, rareLuck: 0.12, flex: 0.25 } as RodStats },
+    { id: 'rod-pro', category: 'rod', name: 'Pro Angler Rod', description: 'Tournament-grade gear with real bite feedback.', price: 12000, unlockLevel: 12, tier: 4, stats: { control: 12, power: 2.1, rareLuck: 0.22, flex: 0.4 } as RodStats },
+    { id: 'rod-deepsea', category: 'rod', name: 'Deep Sea Rod', description: 'Built to handle open-ocean monsters and their bursts.', price: 60000, unlockLevel: 20, tier: 5, stats: { control: 17, power: 2.8, rareLuck: 0.35, flex: 0.5 } as RodStats },
+    { id: 'rod-legendary', category: 'rod', name: 'Legendary Rod', description: 'Said to have never lost a fish.', price: 400000, unlockLevel: 35, tier: 6, stats: { control: 24, power: 3.6, rareLuck: 0.55, flex: 0.65 } as RodStats }
 ];
 
 export const REELS: EquipmentDef[] = [
@@ -44,7 +44,16 @@ export const BOBBERS: EquipmentDef[] = [
     { id: 'bobber-mythic', category: 'bobber', name: 'Starlight Bobber', description: 'Reserved for anglers who\'ve truly earned it.', price: 100000, unlockLevel: 40, tier: 6, stats: { skinColor: 0xea4cff } as BobberStats }
 ];
 
-export const ALL_EQUIPMENT: EquipmentDef[] = [...RODS, ...REELS, ...LINES, ...BAITS, ...BOBBERS];
+export const HOOKS: EquipmentDef[] = [
+    { id: 'hook-rusty', category: 'hook', name: 'Rusty J-Hook', description: 'It\'ll do.', price: 0, unlockLevel: 1, tier: 1, stats: { windowMult: 1.0, directionForgiveness: 0, holdStrength: 0 } as HookStats },
+    { id: 'hook-circle', category: 'hook', name: 'Circle Hook', description: 'Sets itself more often -- a wider, more forgiving strike window.', price: 350, unlockLevel: 3, tier: 2, stats: { windowMult: 1.15, directionForgiveness: 0.2, holdStrength: 0.15 } as HookStats },
+    { id: 'hook-offset', category: 'hook', name: 'Offset Hook', description: 'Bites down harder once set -- holds through jumps and slack.', price: 2800, unlockLevel: 8, tier: 3, stats: { windowMult: 1.25, directionForgiveness: 0.35, holdStrength: 0.3 } as HookStats },
+    { id: 'hook-treble', category: 'hook', name: 'Treble Hook', description: 'Three points -- forgives a wrong strike more often.', price: 16000, unlockLevel: 15, tier: 4, stats: { windowMult: 1.35, directionForgiveness: 0.5, holdStrength: 0.5 } as HookStats },
+    { id: 'hook-barbed', category: 'hook', name: 'Barbed Tournament Hook', description: 'Competition-grade -- barely ever throws.', price: 70000, unlockLevel: 24, tier: 5, stats: { windowMult: 1.45, directionForgiveness: 0.65, holdStrength: 0.7 } as HookStats },
+    { id: 'hook-leviathan', category: 'hook', name: 'Leviathan Gaff Hook', description: 'Built for things that shouldn\'t exist. It does not let go.', price: 380000, unlockLevel: 36, tier: 6, stats: { windowMult: 1.6, directionForgiveness: 0.8, holdStrength: 0.85 } as HookStats }
+];
+
+export const ALL_EQUIPMENT: EquipmentDef[] = [...RODS, ...REELS, ...LINES, ...BAITS, ...BOBBERS, ...HOOKS];
 
 export function getEquipment(id: string): EquipmentDef {
     const e = ALL_EQUIPMENT.find(x => x.id === id);
@@ -57,5 +66,6 @@ export const DEFAULT_EQUIPPED = {
     reel: 'reel-basic',
     line: 'line-cotton',
     bait: 'bait-bread',
-    bobber: 'bobber-red'
+    bobber: 'bobber-red',
+    hook: 'hook-rusty'
 };
