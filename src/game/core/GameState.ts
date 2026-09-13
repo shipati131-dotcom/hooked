@@ -57,6 +57,8 @@ export interface SaveData {
         sfxVolume: number;
         musicVolume: number;
         muted: boolean;
+        /** Unset follows the first-five-catches tutorial; a toggle overrides it. */
+        helpedMode?: boolean;
     };
 
     createdAt: number;

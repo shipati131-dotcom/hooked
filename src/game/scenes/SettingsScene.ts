@@ -43,7 +43,23 @@ export class SettingsScene extends Phaser.Scene {
             }, { width: 220, height: 52, color: COLORS.muted, fontSize: 18 }
         );
         sheet.content.add(muteBtn);
-        y += 110;
+        y += 90;
+
+        sheet.content.add(this.add.text(left + 60, y, 'Helped mode', {
+            fontFamily: 'Nunito, sans-serif', fontSize: '22px', color: '#f4e8cf', fontStyle: '800'
+        }));
+        sheet.content.add(this.add.text(left + 60, y + 34, 'Show pull / release tags, instructions and countdowns during battles.', {
+            fontFamily: 'Nunito, sans-serif', fontSize: '17px', color: '#d8c9a3', fontStyle: '700'
+        }));
+        const helpEnabled = () => services.save.settings.helpedMode ?? services.save.stats.totalCaught < 5;
+        const helpBtn = new Button(this, left + 1040, y + 28, helpEnabled() ? 'ON' : 'OFF', () => {
+            services.save.settings.helpedMode = !helpEnabled();
+            helpBtn.setLabel(helpEnabled() ? 'ON' : 'OFF');
+            helpBtn.setColorTheme(helpEnabled() ? COLORS.accent : COLORS.muted);
+            services.requestSave();
+        }, { width: 140, height: 54, fontSize: 22, color: helpEnabled() ? COLORS.accent : COLORS.muted });
+        sheet.content.add(helpBtn);
+        y += 120;
 
         sheet.content.add(this.add.text(left + 60, y, 'Danger Zone', {
             fontFamily: 'Fredoka, sans-serif', fontSize: '20px', color: '#c24b3d', fontStyle: '700'

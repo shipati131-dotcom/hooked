@@ -181,11 +181,13 @@ export class FishingScene extends Phaser.Scene {
         const clearInput = () => { this.isPointerDown = false; this.reelKeyDown = false; this.keyboardSteer = 0; };
         this.events.on(Phaser.Scenes.Events.PAUSE, clearInput);
         this.events.on(Phaser.Scenes.Events.RESUME, clearInput);
+        this.events.on(Phaser.Scenes.Events.RESUME, this.refreshFightHelp, this);
         this.game.events.on(Phaser.Core.Events.BLUR, clearInput);
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.game.events.off(Phaser.Core.Events.BLUR, clearInput);
             this.events.off(Phaser.Scenes.Events.PAUSE, clearInput);
             this.events.off(Phaser.Scenes.Events.RESUME, clearInput);
+            this.events.off(Phaser.Scenes.Events.RESUME, this.refreshFightHelp, this);
         });
 
         // Development-only shortcut used by the visual QA loop: skips straight
@@ -379,9 +381,8 @@ export class FishingScene extends Phaser.Scene {
             this.promptText.setVisible(false);
             const key = `fish-${rolled.fish.id}`;
             generateFishTexture(this, key, rolled.fish.art);
-            const showHelp = services.save.stats.totalCaught < 5;
-            this.fightHud.beginEncounter(rolled.fish.name, rolled.fish.rarity, showHelp);
-            this.fightView.beginEncounter(key, rolled.fish.rarity, showHelp);
+            const showHelp = services.save.settings.helpedMode ?? services.save.stats.totalCaught < 5;
+            this.refreshFightHelp();
             if (showHelp) this.showMechanicHintIfAny(services);
         });
 
@@ -415,6 +416,15 @@ export class FishingScene extends Phaser.Scene {
             floatingText(this, this.bobberX, this.bobberY - 40, 'It stole the bait!', '#e8a08c', 24);
             this.onIdleReturn();
         });
+    }
+
+    private refreshFightHelp(): void {
+        const fish = this.fishing.currentFish();
+        if (this.fishing.state !== 'fighting' || !fish) return;
+        const { save } = getServices(this);
+        const showHelp = save.settings.helpedMode ?? save.stats.totalCaught < 5;
+        this.fightHud.beginEncounter(fish.name, fish.rarity, showHelp);
+        this.fightView.beginEncounter(`fish-${fish.id}`, fish.rarity, showHelp);
     }
 
     private showMechanicHintIfAny(services: ReturnType<typeof getServices>): void {
